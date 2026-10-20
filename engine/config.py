@@ -48,6 +48,7 @@ class StyleCfg(BaseModel):
     language: str = "uk"
     voice: str = "Коротко, по ділу, без води."
     rules: list[str] = []
+    formats: list[str] = []         # варианты подачи; движок чередует их, чтобы посты не были под копирку
     max_chars: int = Field(900, ge=200, le=3500)
     hashtags: int = Field(0, ge=0, le=5)
     include_source_link: bool = True

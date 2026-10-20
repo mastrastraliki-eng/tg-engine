@@ -124,7 +124,7 @@ def test_review_mode_holds_posts(monkeypatch):
 
 def test_unsuitable_item_rejected():
     class No(FakeRewriter):
-        def rewrite(self, ch, item, full_text="", recent=()):
+        def rewrite(self, ch, item, full_text="", recent=(), fmt=""):
             return Draft(suitable=False, reason="off-topic", text="")
     ch = make_channel()
     eng, st = setup_engine(ch, rewriter=No())
@@ -240,7 +240,7 @@ def test_recent_headlines_passed_to_llm(monkeypatch):
     seen = {}
 
     class Spy(FakeRewriter):
-        def rewrite(self, ch, item, full_text="", recent=()):
+        def rewrite(self, ch, item, full_text="", recent=(), fmt=""):
             seen.setdefault("recent", list(recent))
             return super().rewrite(ch, item, full_text, recent)
     ch = make_channel()
@@ -287,3 +287,12 @@ def test_imagegen_falls_back_to_next_service(monkeypatch, tmp_path):
     monkeypatch.setitem(imagegen.PROVIDERS, "pollinations", lambda c, p, m: calls.append("pol") or b"\xff\xd8\xffjpg")
     path = imagegen.generate("a lighthouse", "m", tmp_path, client=object())
     assert calls == ["cf", "pol"] and path.endswith(".jpg")
+
+
+def test_formats_rotate_without_repeats():
+    ch = make_channel(style={"formats": ["a", "b", "c"]})
+    eng = Engine(Settings(), {ch.id: ch}, Storage(":memory:"), FakeRewriter(), bot_factory=FakeBot,
+                 rng=random.Random(3))
+    seq = [eng.next_format(ch) for _ in range(30)]
+    assert set(seq) == {"a", "b", "c"}
+    assert all(len({seq[i], seq[i + 1], seq[i + 2]}) == 3 for i in range(len(seq) - 2))

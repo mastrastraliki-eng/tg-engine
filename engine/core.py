@@ -67,6 +67,17 @@ class Engine:
             self.st.set_state("_global", k, str(used + 1))
         return path
 
+    def next_format(self, ch: ChannelCfg) -> str:
+        """Случайный формат подачи, но не тот же, что в двух последних постах."""
+        fmts = ch.style.formats
+        if not fmts:
+            return ""
+        recent = (self.st.get_state(ch.id, "last_formats") or "").split("|")
+        pool = [i for i in range(len(fmts)) if str(i) not in recent[-2:]] or list(range(len(fmts)))
+        i = self.rng.choice(pool)
+        self.st.set_state(ch.id, "last_formats", "|".join((recent + [str(i)])[-2:]))
+        return fmts[i]
+
     def alert(self, msg: str):
         log.error("ALERT: %s", msg)
         token = os.environ.get(self.s.alert_bot_token_env or "")
@@ -107,7 +118,8 @@ class Engine:
                 with httpx.Client(headers={"User-Agent": sources.UA}, timeout=20, follow_redirects=True) as c:
                     full = sources.fetch_full_text(c, item["url"])
             try:
-                draft = self.rw.rewrite(ch, item, full, recent=self.st.recent_headlines(ch.id))
+                draft = self.rw.rewrite(ch, item, full, recent=self.st.recent_headlines(ch.id),
+                                        fmt=self.next_format(ch))
             except BudgetExceeded:
                 log.warning("LLM budget reached, skipping prepare")
                 return made
