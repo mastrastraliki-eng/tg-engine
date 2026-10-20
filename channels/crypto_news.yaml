@@ -6,7 +6,7 @@ niche: >
   злами та безпека. Для людей, які тримають крипту, а не для трейдерів-скальперів.
 bot_token_env: CRYPTO_BOT_TOKEN
 chat_id_env: CRYPTO_CHAT_ID
-mode: review                          # спочатку модеруємо вручну, потім можна auto
+mode: auto                            # стиль утверждён, крипта идёт сама
 review_chat_id_env: REVIEW_CHAT_ID
 queue_target: 3
 sources:
