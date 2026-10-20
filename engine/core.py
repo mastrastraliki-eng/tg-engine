@@ -285,7 +285,7 @@ class Engine:
             image = None
             if ch.style.images == "card":
                 try:  # шаблон по типу тревоги, рисуется один раз и дальше берётся с диска
-                    image = cards.alert_card(it["title"] + " " + (it["summary"] or ""), ch.style.card_label,
+                    image = cards.alert_card(it["title"] + " " + (it["summary"] or ""), ch.style.card_label or ch.title,
                                              self.s.cards_dir)
                 except Exception as e:
                     log.warning("[%s] alert card failed: %s", ch.id, e)
