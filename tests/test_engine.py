@@ -197,3 +197,19 @@ def test_relay_skips_history_then_posts_verbatim(monkeypatch):
     text = FakeBot.sent[0][2]
     assert text.startswith("🟢 23:10 Відбій тривоги в Київська область.")
     assert 'Джерело: <a href="https://t.me/air_alert_ua/103">Повітряна тривога</a>' in text
+
+
+def test_market_summary_uses_api_numbers():
+    from engine.market import build_summary
+    coins = [
+        {"id": "bitcoin", "symbol": "btc", "current_price": 67123.4, "price_change_percentage_24h": 2.345},
+        {"id": "ethereum", "symbol": "eth", "current_price": 2456.78, "price_change_percentage_24h": -1.2},
+        {"id": "tether", "symbol": "usdt", "current_price": 1.0, "price_change_percentage_24h": 0.01},
+        {"id": "pepe", "symbol": "pepe", "current_price": 0.00001234, "price_change_percentage_24h": 15.0},
+        {"id": "doge", "symbol": "doge", "current_price": 0.12, "price_change_percentage_24h": -8.0},
+    ]
+    text = build_summary(coins, ["bitcoin", "ethereum"], movers=1)
+    assert "<b>BTC</b> $67 123  🟢 +2.3%" in text
+    assert "<b>ETH</b> $2 457  🔴 -1.2%" in text
+    assert "PEPE 🟢 +15.0%" in text and "DOGE 🔴 -8.0%" in text
+    assert "USDT" not in text

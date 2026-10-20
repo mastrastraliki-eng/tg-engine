@@ -9,7 +9,7 @@ import time
 
 import httpx
 
-from . import sources
+from . import market, sources
 from .config import ChannelCfg, Settings
 from .rewriter import BudgetExceeded, finalize
 from .schedule import day_start_ts, next_slot
@@ -250,6 +250,34 @@ class Engine:
                 break
         return sent
 
+    def market_summary_due(self, ch: ChannelCfg, now: float) -> bool:
+        m = ch.market_summary
+        if not m.enabled:
+            return False
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        local = datetime.fromtimestamp(now, ZoneInfo(ch.schedule.timezone))
+        hh, mm = (int(x) for x in m.time.split(":"))
+        today = local.strftime("%Y-%m-%d")
+        return (local.hour, local.minute) >= (hh, mm) and self.st.get_state(ch.id, "summary_date") != today
+
+    def market_summary(self, ch: ChannelCfg, now: float) -> int | None:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        today = datetime.fromtimestamp(now, ZoneInfo(ch.schedule.timezone)).strftime("%Y-%m-%d")
+        with httpx.Client(headers={"User-Agent": sources.UA}, timeout=20) as c:
+            coins = market.fetch_markets(c)
+        text = market.build_summary(coins, ch.market_summary.coins, ch.market_summary.movers, ch.style.language)
+        if ch.style.signature:
+            text += "\n\n" + html.escape(ch.style.signature)
+        self.st.set_state(ch.id, "summary_date", today)
+        status = "queued" if ch.market_summary.skip_review or ch.mode == "auto" else "pending_review"
+        pid = self.st.add_post(ch.id, text, status, kind="summary")
+        if status == "pending_review":
+            self.send_for_review(ch, pid, text, None)
+            return None
+        return self.send(ch, self.st.get_post(pid))
+
     def tick(self, now: float | None = None):
         now = now or time.time()
         for ch in self.channels.values():
@@ -277,6 +305,11 @@ class Engine:
             log.exception("review poll crashed: %s", e)
         for ch in self.channels.values():
             if ch.enabled and ch.kind == "news":
+                try:
+                    if self.market_summary_due(ch, now):
+                        self.market_summary(ch, now)
+                except Exception as e:
+                    log.warning("[%s] market summary failed: %s", ch.id, e)
                 try:
                     self.publish_due(ch, now)
                 except Exception as e:

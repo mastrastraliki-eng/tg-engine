@@ -76,6 +76,15 @@ class RelayCfg(BaseModel):
     max_per_poll: int = Field(10, ge=1, le=30)
 
 
+class MarketSummaryCfg(BaseModel):
+    """Ежедневная сводка рынка (только для крипто-канала). Цифры из API, без LLM."""
+    enabled: bool = False
+    time: str = "09:00"                 # локальное время канала
+    coins: list[str] = ["bitcoin", "ethereum", "solana", "binancecoin", "ripple", "the-open-network"]
+    movers: int = 3
+    skip_review: bool = True            # данные устаревают, публикуем сразу
+
+
 class ChannelCfg(BaseModel):
     id: str
     title: str
@@ -93,6 +102,7 @@ class ChannelCfg(BaseModel):
     filters: FilterCfg = FilterCfg()
     promo: PromoCfg = PromoCfg()
     relay: RelayCfg = RelayCfg()
+    market_summary: MarketSummaryCfg = MarketSummaryCfg()
     queue_target: int = 3               # сколько готовых постов держать в очереди
 
     @property

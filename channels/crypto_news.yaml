@@ -36,3 +36,8 @@ promo:
   enabled: true
   every_days: 5
   partners: [ua_news]
+market_summary:
+  enabled: true
+  time: "09:00"
+  coins: [bitcoin, ethereum, solana, binancecoin, ripple, the-open-network]
+  movers: 3

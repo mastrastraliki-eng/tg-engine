@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY,
     channel TEXT NOT NULL,
     item_id INTEGER,
-    kind TEXT NOT NULL DEFAULT 'news',    -- news | promo
+    kind TEXT NOT NULL DEFAULT 'news',    -- news | promo | relay | summary
     text TEXT NOT NULL,
     image TEXT,
     status TEXT NOT NULL,                 -- queued | pending_review | rejected | published | failed

@@ -87,6 +87,12 @@ def main(argv=None):
                                      "AND reason NOT IN ('too old') LIMIT 5", (ch.id,)):
                 print(f"✗ {row['title'][:70]} — {row['reason']}")
             return 0
+        if ch.market_summary.enabled:
+            from . import market
+            import httpx
+            with httpx.Client(timeout=20) as c:
+                print("─" * 60 + "\n" + market.build_summary(market.fetch_markets(c), ch.market_summary.coins,
+                                                              ch.market_summary.movers, ch.style.language) + "\n")
         print(f"собрано новых материалов: {eng.collect(ch)}")
         eng.prepare(ch)
         for row in st.db.execute("SELECT * FROM posts WHERE channel=?", (ch.id,)):
