@@ -74,7 +74,8 @@ def generate(prompt: str, model: str, out_dir: str | Path, client: httpx.Client 
              providers: list[str] = ("cloudflare", "pollinations", "gemini"), style: str = "") -> str | None:
     if not prompt.strip():
         return None
-    full = (style.strip() + " No text, no letters, no real company logos, no real people's faces. Scene: " + prompt
+    full = (style.strip() + " Scene: " + prompt + ". " + style.strip()
+            + " No text, no letters, no real company logos, no real people's faces."
             if style.strip() else STYLE + prompt)
     own = client is None
     client = client or httpx.Client(timeout=120)
