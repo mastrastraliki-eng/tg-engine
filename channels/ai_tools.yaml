@@ -1,0 +1,34 @@
+id: ai_tools
+title: "ШІ-інструменти"
+username: "@ai_tools_ua"
+niche: >
+  Корисні нейромережі та ШІ-сервіси для роботи і життя: нові інструменти, великі оновлення
+  (ChatGPT, Claude, Gemini, Midjourney тощо), практичні способи застосування. Не наукові статті.
+bot_token_env: AI_BOT_TOKEN
+chat_id_env: AI_CHAT_ID
+mode: review
+review_chat_id_env: REVIEW_CHAT_ID
+sources:
+  - {type: rss, url: "https://techcrunch.com/category/artificial-intelligence/feed/", name: TechCrunch AI}
+  - {type: rss, url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", name: The Verge AI}
+  - {type: rss, url: "https://hnrss.org/newest?q=AI+tool&points=100", name: Hacker News, weight: 0.8}
+  - {type: reddit, subreddit: artificial, weight: 0.7}
+schedule:
+  posts_per_day: 5
+  active_hours: [9, 22]
+  min_gap_minutes: 60
+style:
+  language: uk
+  voice: "Практично: що це, кому корисно, як спробувати. Ніби колега ділиться знахідкою."
+  rules:
+    - "Якщо це інструмент, обов'язково напиши, чи є безкоштовна версія (тільки якщо це є в матеріалі)."
+    - "Відхиляй новини про фінансування стартапів без продукту, яким можна скористатися."
+  max_chars: 900
+  hashtags: 0
+  signature: "@ai_tools_ua"
+filters:
+  max_age_hours: 48
+promo:
+  enabled: true
+  every_days: 6
+  partners: [crypto_news, wow_facts]

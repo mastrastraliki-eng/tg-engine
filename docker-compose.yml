@@ -1,0 +1,9 @@
+services:
+  engine:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./channels:/app/channels
+      - ./settings.yaml:/app/settings.yaml

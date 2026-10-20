@@ -1,0 +1,38 @@
+id: crypto_news
+title: "Крипто Пульс"
+username: "@crypto_puls_ua"          # замени на реальный
+niche: >
+  Новини криптовалют і блокчейну: ринок BTC/ETH, регулювання, великі угоди, біржі,
+  злами та безпека. Для людей, які тримають крипту, а не для трейдерів-скальперів.
+bot_token_env: CRYPTO_BOT_TOKEN
+chat_id_env: CRYPTO_CHAT_ID
+mode: review                          # спочатку модеруємо вручну, потім можна auto
+review_chat_id_env: REVIEW_CHAT_ID
+queue_target: 3
+sources:
+  - {type: rss, url: "https://forklog.com/feed", name: ForkLog, weight: 1.2}
+  - {type: rss, url: "https://cointelegraph.com/rss", name: Cointelegraph}
+  - {type: rss, url: "https://decrypt.co/feed", name: Decrypt}
+  - {type: rss, url: "https://www.coindesk.com/arc/outboundfeeds/rss/", name: CoinDesk}
+schedule:
+  posts_per_day: 7
+  active_hours: [8, 23]
+  min_gap_minutes: 50
+style:
+  language: uk
+  voice: "Спокійно і по суті, як досвідчений друг, що пояснює новину. Без хайпу і «to the moon»."
+  rules:
+    - "Ніколи не давай інвестиційних порад і прогнозів ціни. Якщо новина про ціну, просто факти."
+    - "Пояснюй терміни одним реченням, якщо вони неочевидні новачку."
+    - "Відхиляй пресрелізи нових токенів, airdrop-и, ICO та платні публікації."
+  max_chars: 800
+  hashtags: 1
+  include_source_link: true
+  signature: "@crypto_puls_ua"
+filters:
+  exclude_keywords: ["sponsored", "press release", "партнерський матеріал", "presale"]
+  max_age_hours: 24
+promo:
+  enabled: true
+  every_days: 5
+  partners: [ai_tools]

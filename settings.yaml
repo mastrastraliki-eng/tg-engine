@@ -1,0 +1,8 @@
+db_path: data/engine.db
+channels_dir: channels
+llm_model: claude-opus-5-5      # дешевле: claude-sonnet-5-5 или claude-haiku-5-5
+llm_effort: low
+max_llm_calls_per_day: 300      # предохранитель от счёта за API
+tick_seconds: 60
+collect_every_minutes: 30
+dry_run: false
