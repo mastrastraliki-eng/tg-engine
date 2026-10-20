@@ -54,7 +54,7 @@ class Engine:
             return card, None
         return source_img, card
 
-    def ai_image(self, prompt: str) -> str | None:
+    def ai_image(self, prompt: str, style: str = "") -> str | None:
         """ИИ-иллюстрация с дневным лимитом, чтобы не разориться."""
         from datetime import date
         from . import imagegen
@@ -62,7 +62,8 @@ class Engine:
         used = int(self.st.get_state("_global", k, "0"))
         if not prompt or used >= self.s.max_ai_images_per_day:
             return None
-        path = imagegen.generate(prompt, self.s.image_model, self.s.cards_dir, providers=self.s.image_providers)
+        path = imagegen.generate(prompt, self.s.image_model, self.s.cards_dir, providers=self.s.image_providers,
+                                 style=style)
         if path:
             self.st.set_state("_global", k, str(used + 1))
         return path
@@ -141,7 +142,7 @@ class Engine:
                 src_img = None
             image, fallback = self.images_for(ch, first, src_img)
             if ch.style.ai_images == "always" or (ch.style.ai_images == "no_photo" and not src_img):
-                ai = self.ai_image(draft.image_prompt)
+                ai = self.ai_image(draft.image_prompt, ch.style.ai_style)
                 if ai:
                     image, fallback = ai, image
             post_id = self.st.add_post(ch.id, text, status, item_id=item["id"], image=image, fallback_image=fallback)

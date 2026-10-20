@@ -64,6 +64,7 @@ class StyleCfg(BaseModel):
     card_label: str = ""            # подпись на карточке; по умолчанию название канала
     # ИИ-иллюстрации (Gemini): off; no_photo — когда в источнике нет фото; always. Не для новостей о войне.
     ai_images: Literal["off", "no_photo", "always"] = "off"
+    ai_style: str = ""              # единый стиль ИИ-картинок канала (по-английски)
 
 
 class FilterCfg(BaseModel):
