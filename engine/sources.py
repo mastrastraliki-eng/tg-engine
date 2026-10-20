@@ -96,7 +96,7 @@ def fetch_source(client: httpx.Client, src: SourceCfg) -> list[dict]:
         r.raise_for_status()
         items = parse_rss(r.content, src)
     else:
-        r = client.get(f"https://www.reddit.com/r/{src.subreddit}/top/.json", params={"t": "day", "limit": 25})
+        r = client.get(f"https://old.reddit.com/r/{src.subreddit}/top/.json", params={"t": "day", "limit": 25})
         r.raise_for_status()
         items = parse_reddit(r.json(), src)
     for it in items:

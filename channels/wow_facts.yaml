@@ -9,8 +9,12 @@ chat_id_env: FACTS_CHAT_ID
 mode: review
 review_chat_id_env: REVIEW_CHAT_ID
 sources:
-  - {type: reddit, subreddit: todayilearned}
-  - {type: reddit, subreddit: Damnthatsinteresting, weight: 0.8}
+  # Reddit блокирует анонимный .json, поэтому берём его RSS-ленты
+  - {type: rss, url: "https://www.reddit.com/r/todayilearned/top/.rss?t=day", name: r/todayilearned}
+  - {type: rss, url: "https://www.reddit.com/r/Damnthatsinteresting/top/.rss?t=day", name: r/Damnthatsinteresting, weight: 0.8}
+  - {type: rss, url: "https://www.sciencealert.com/feed", name: ScienceAlert}
+  - {type: rss, url: "https://www.livescience.com/feeds/all", name: Live Science}
+  - {type: rss, url: "https://www.atlasobscura.com/feeds/latest", name: Atlas Obscura, weight: 0.9}
   - {type: rss, url: "https://www.nasa.gov/feeds/iotd-feed/", name: NASA Image of the Day, use_images: true, weight: 1.3}
 schedule:
   posts_per_day: 4
@@ -29,6 +33,7 @@ style:
   signature: "@ogo_facts_ua"
 filters:
   max_age_hours: 72
+  min_title_len: 8
 promo:
   enabled: true
   every_days: 7

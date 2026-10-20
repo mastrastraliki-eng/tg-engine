@@ -12,7 +12,7 @@ sources:
   - {type: rss, url: "https://techcrunch.com/category/artificial-intelligence/feed/", name: TechCrunch AI}
   - {type: rss, url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", name: The Verge AI}
   - {type: rss, url: "https://hnrss.org/newest?q=AI+tool&points=100", name: Hacker News, weight: 0.8}
-  - {type: reddit, subreddit: artificial, weight: 0.7}
+  - {type: rss, url: "https://www.reddit.com/r/artificial/top/.rss?t=day", name: r/artificial, weight: 0.7}
 schedule:
   posts_per_day: 5
   active_hours: [9, 22]
