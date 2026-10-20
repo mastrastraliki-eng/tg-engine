@@ -1,7 +1,7 @@
 id: alerts
 title: "🛡 Вартовий неба | Тривоги"
 kind: relay                           # дословно и сразу, без нейросети
-username: ""
+username: "vartovyi_neba_ua"
 niche: "Повітряні тривоги по Україні та офіційні військові зведення"
 bot_token_env: ALERTS_BOT_TOKEN
 chat_id_env: ALERTS_CHAT_ID
