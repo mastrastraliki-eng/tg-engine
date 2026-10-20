@@ -37,6 +37,8 @@ def main(argv=None):
     p = sub.add_parser("resume", help="снять канал с паузы")
     p.add_argument("channel")
     sub.add_parser("stats", help="статистика постов")
+    p = sub.add_parser("health", help="отчёт о работе (как ежедневный в 9:00)")
+    p.add_argument("--send", action="store_true", help="отправить в личку от бота уведомлений")
     a = ap.parse_args(argv)
 
     load_env()
@@ -112,6 +114,15 @@ def main(argv=None):
     if a.cmd == "stats":
         for r in st.stats():
             print(f"{r['channel']:16} {r['status']:15} {r['n']}")
+        return 0
+
+    if a.cmd == "health":
+        from . import health
+        eng = Engine(s, channels, st, FakeRewriter())
+        text = health.build_report(eng)
+        print(text)
+        if a.send:
+            health.send(eng, text)
         return 0
 
     eng = Engine(s, channels, st, Rewriter(s, st))

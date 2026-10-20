@@ -10,7 +10,7 @@ import time
 
 import httpx
 
-from . import cards, market, sources
+from . import cards, health, market, sources
 from .config import ChannelCfg, Settings
 from .rewriter import BudgetExceeded, finalize
 from .schedule import day_start_ts, next_slot
@@ -390,8 +390,13 @@ class Engine:
                     self.publish_due(ch, now)
                 except Exception as e:
                     log.exception("[%s] publish crashed: %s", ch.id, e)
+        try:
+            health.daily(self, now)
+        except Exception as e:
+            log.warning("health report crashed: %s", e)
 
     def run_forever(self):
+        health.install()
         log.info("engine started: %d channels, dry_run=%s", len(self.channels), self.s.dry_run)
         polls = [c.relay.poll_seconds for c in self.channels.values() if c.enabled and c.kind == "relay"]
         sleep = min([self.s.tick_seconds, *polls])

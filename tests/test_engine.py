@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from engine import sources
+from engine import health, sources
 from engine.config import ChannelCfg, ScheduleCfg, Settings, SourceCfg, load_channels
 from engine.core import Engine
 from engine.rewriter import Draft, FakeRewriter, sanitize_html
@@ -30,6 +30,7 @@ RSS = f"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
 def _offline(monkeypatch, tmp_path):
     """Тесты не ходят в сеть за og:image и не пишут карточки в настоящую data/."""
     monkeypatch.setattr(sources, "fetch_og_image", lambda c, u: None)
+    monkeypatch.setattr(health, "_check_keys", lambda c: [])
     monkeypatch.setenv("TG_CARDS_DIR", str(tmp_path))
 
 
@@ -267,6 +268,7 @@ def test_post_gets_card_when_source_has_no_photo(monkeypatch, tmp_path):
     eng, st = setup_engine(ch)
     eng.s.cards_dir = str(tmp_path)
     monkeypatch.setattr(sources, "fetch_og_image", lambda c, u: None)
+    monkeypatch.setattr(health, "_check_keys", lambda c: [])
     eng.prepare(ch)
     post = st.db.execute("SELECT image, fallback_image FROM posts").fetchone()
     assert post["image"].endswith(".png") and post["fallback_image"] is None
@@ -315,3 +317,30 @@ def test_editor_picks_and_polishes():
     ch = make_channel(style={"editor": True})
     d = R().rewrite(ch, {"title": "t", "source": "s"}, fmt="a", alt_fmt="b")
     assert d.text == "<b>Лучший</b>" and d.image_prompt == "coin" and len(calls) == 3
+
+
+def test_health_report_once_a_day(monkeypatch):
+    monkeypatch.setenv("T1", "tok1")
+    monkeypatch.setenv("C1", "@chan")
+    monkeypatch.setenv("AB", "alerttok")
+    monkeypatch.setenv("AC", "42")
+    calls = []
+
+    class CountBot(FakeBot):
+        def call(self, method, **p):
+            calls.append((self.token, method, p))
+            return 7 if method == "getChatMemberCount" else {}
+    ch = make_channel(username="chan")
+    eng, st = setup_engine(ch)
+    eng.bot_factory = CountBot
+    eng.s.alert_bot_token_env, eng.s.alert_chat_id_env = "AB", "AC"
+    morning = datetime(2026, 10, 21, 9, 5, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
+    assert not health.daily(eng, morning - 3600)      # до 9:00 рано
+    assert health.daily(eng, morning)
+    assert not health.daily(eng, morning + 600)       # второй раз в тот же день не шлёт
+    sent = [p["text"] for t, m, p in calls if m == "sendMessage"]
+    assert len(sent) == 1 and "⚠" in sent[0] and "ни одного поста" in sent[0] and "подписчиков 7" in sent[0]
+    st.add_post(ch.id, "p", "queued")
+    st.set_post_status(st.next_queued(ch.id)["id"], "published")
+    text = health.build_report(eng)
+    assert text.startswith("✅") and "(+0)" in text
