@@ -119,7 +119,8 @@ class Engine:
                     full = sources.fetch_full_text(c, item["url"])
             try:
                 draft = self.rw.rewrite(ch, item, full, recent=self.st.recent_headlines(ch.id),
-                                        fmt=self.next_format(ch))
+                                        fmt=self.next_format(ch),
+                                        alt_fmt=self.next_format(ch) if ch.style.editor else "")
             except BudgetExceeded:
                 log.warning("LLM budget reached, skipping prepare")
                 return made

@@ -124,7 +124,7 @@ def test_review_mode_holds_posts(monkeypatch):
 
 def test_unsuitable_item_rejected():
     class No(FakeRewriter):
-        def rewrite(self, ch, item, full_text="", recent=(), fmt=""):
+        def rewrite(self, ch, item, full_text="", recent=(), fmt="", alt_fmt=""):
             return Draft(suitable=False, reason="off-topic", text="")
     ch = make_channel()
     eng, st = setup_engine(ch, rewriter=No())
@@ -240,7 +240,7 @@ def test_recent_headlines_passed_to_llm(monkeypatch):
     seen = {}
 
     class Spy(FakeRewriter):
-        def rewrite(self, ch, item, full_text="", recent=(), fmt=""):
+        def rewrite(self, ch, item, full_text="", recent=(), fmt="", alt_fmt=""):
             seen.setdefault("recent", list(recent))
             return super().rewrite(ch, item, full_text, recent)
     ch = make_channel()
@@ -296,3 +296,22 @@ def test_formats_rotate_without_repeats():
     seq = [eng.next_format(ch) for _ in range(30)]
     assert set(seq) == {"a", "b", "c"}
     assert all(len({seq[i], seq[i + 1], seq[i + 2]}) == 3 for i in range(len(seq) - 2))
+
+
+def test_editor_picks_and_polishes():
+    from engine.rewriter import Rewriter
+    calls = []
+
+    class R(Rewriter):
+        def __init__(self):
+            pass
+
+        def _call(self, system, user, schema):
+            calls.append(system[:40])
+            if "главный редактор" in system:
+                assert "<variant n=\"2\">" in user
+                return Draft(suitable=True, reason="", text="<b>Лучший</b>")
+            return Draft(suitable=True, reason="", text="черновик", image_prompt="coin")
+    ch = make_channel(style={"editor": True})
+    d = R().rewrite(ch, {"title": "t", "source": "s"}, fmt="a", alt_fmt="b")
+    assert d.text == "<b>Лучший</b>" and d.image_prompt == "coin" and len(calls) == 3
