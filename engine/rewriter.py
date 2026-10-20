@@ -95,6 +95,9 @@ def sanitize_html(text: str) -> str:
 def finalize(ch: ChannelCfg, body: str, url: str | None) -> str:
     parts = [sanitize_html(body)]
     tail = []
+    if url:
+        from .sources import strip_tracking
+        url = strip_tracking(url)
     if ch.style.include_source_link and url:
         tail.append(f'<a href="{html.escape(url)}">Джерело</a>' if ch.style.language == "uk"
                     else f'<a href="{html.escape(url)}">Источник</a>')
@@ -130,8 +133,11 @@ class Rewriter:
             return None
         return resp.parsed_output
 
-    def rewrite(self, ch: ChannelCfg, item: dict, full_text: str = "") -> Draft | None:
-        user = (f"<source name=\"{item.get('source')}\">\nЗаголовок: {item['title']}\n"
+    def rewrite(self, ch: ChannelCfg, item: dict, full_text: str = "", recent: list[str] = ()) -> Draft | None:
+        seen = ("Уже есть в канале за последние сутки (если материал о том же событии и не добавляет "
+                "существенно нового, верни suitable=false с причиной «дубль»):\n"
+                + "\n".join(f"- {h}" for h in recent) + "\n\n") if recent else ""
+        user = seen + (f"<source name=\"{item.get('source')}\">\nЗаголовок: {item['title']}\n"
                 f"Анонс: {item.get('summary') or '-'}\n"
                 + (f"Текст статьи: {full_text}\n" if full_text else "") + "</source>")
         return self._call(system_prompt(ch), user, Draft)
@@ -151,7 +157,7 @@ class Rewriter:
 class FakeRewriter:
     """Для preview без ключа API: показывает, что пошло бы в LLM."""
 
-    def rewrite(self, ch, item, full_text=""):
+    def rewrite(self, ch, item, full_text="", recent=()):
         return Draft(suitable=True, reason="fake",
                      text=f"<b>{item['title']}</b>\n\n{(item.get('summary') or '')[:300]}")
 

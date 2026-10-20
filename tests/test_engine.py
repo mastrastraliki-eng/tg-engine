@@ -117,7 +117,7 @@ def test_review_mode_holds_posts(monkeypatch):
 
 def test_unsuitable_item_rejected():
     class No(FakeRewriter):
-        def rewrite(self, ch, item, full_text=""):
+        def rewrite(self, ch, item, full_text="", recent=()):
             return Draft(suitable=False, reason="off-topic", text="")
     ch = make_channel()
     eng, st = setup_engine(ch, rewriter=No())
@@ -213,3 +213,31 @@ def test_market_summary_uses_api_numbers():
     assert "<b>ETH</b> $2 457  🔴 -1.2%" in text
     assert "PEPE 🟢 +15.0%" in text and "DOGE 🔴 -8.0%" in text
     assert "USDT" not in text
+
+
+def test_telegram_reply_quote_ignored():
+    page = TG_PAGE.replace('<div class="tgme_widget_message_text js-message_text" dir="auto">🟢',
+                           '<div class="tgme_widget_message_reply"><div class="tgme_widget_message_text js-message_reply_text">'
+                           'старий пост</div></div><div class="tgme_widget_message_text js-message_text" dir="auto">🟢')
+    items = sources.parse_telegram(page, SourceCfg(type="telegram", channel="air_alert_ua"))
+    assert items[1]["body"].startswith("🟢 22:50") and "старий" not in items[1]["body"]
+
+
+def test_source_link_without_utm():
+    from engine.rewriter import finalize
+    text = finalize(make_channel(), "<b>x</b>", "https://cointelegraph.com/news/a?utm_source=rss&id=3")
+    assert 'href="https://cointelegraph.com/news/a?id=3"' in text
+
+
+def test_recent_headlines_passed_to_llm(monkeypatch):
+    seen = {}
+
+    class Spy(FakeRewriter):
+        def rewrite(self, ch, item, full_text="", recent=()):
+            seen.setdefault("recent", list(recent))
+            return super().rewrite(ch, item, full_text, recent)
+    ch = make_channel()
+    eng, st = setup_engine(ch, rewriter=Spy())
+    st.add_post(ch.id, "<b>Атака на Київ</b>\n\nтекст", "published")
+    eng.prepare(ch)
+    assert seen["recent"] == ["Атака на Київ"]

@@ -42,6 +42,8 @@ def main(argv=None):
     load_env()
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # httpx пишет полный URL запроса, а в URL Bot API лежит токен бота
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     s = load_settings(a.settings)
     channels = load_channels(s.channels_dir)
 

@@ -11,9 +11,12 @@ review_chat_id_env: REVIEW_CHAT_ID
 queue_target: 3
 sources:
   - {type: rss, url: "https://forklog.com/feed", name: ForkLog, weight: 1.2}
+  - {type: rss, url: "https://incrypted.com/feed/", name: Incrypted, weight: 1.2}
+  - {type: rss, url: "https://bits.media/rss2/", name: Bits.media, weight: 0.8}
+  - {type: rss, url: "https://www.coindesk.com/arc/outboundfeeds/rss/", name: CoinDesk, fetch_full_text: true}
+  - {type: rss, url: "https://www.theblock.co/rss.xml", name: The Block, fetch_full_text: true}
   - {type: rss, url: "https://cointelegraph.com/rss", name: Cointelegraph}
-  - {type: rss, url: "https://decrypt.co/feed", name: Decrypt}
-  - {type: rss, url: "https://www.coindesk.com/arc/outboundfeeds/rss/", name: CoinDesk}
+  - {type: rss, url: "https://decrypt.co/feed", name: Decrypt, weight: 0.9}
 schedule:
   posts_per_day: 7
   active_hours: [8, 23]

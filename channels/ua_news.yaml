@@ -13,7 +13,7 @@ queue_target: 4
 sources:
   - {type: rss, url: "https://www.ukrinform.ua/rss/block-lastnews", name: Укрінформ, weight: 1.2}
   - {type: rss, url: "https://www.pravda.com.ua/rss/view_news/", name: Українська правда, weight: 1.2}
-  - {type: rss, url: "https://suspilne.media/rss/all.rss", name: Суспільне, weight: 1.2}
+  - {type: telegram, channel: suspilnenews, name: Суспільне, weight: 1.2}   # сайт отдаёт 403 ботам
   - {type: rss, url: "https://www.rbc.ua/static/rss/all.ukr.rss.xml", name: РБК-Україна}
   - {type: rss, url: "https://www.eurointegration.com.ua/rss/", name: Європейська правда, weight: 0.9}
   - {type: telegram, channel: V_Zelenskiy_official, name: Володимир Зеленський, weight: 1.3}

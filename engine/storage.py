@@ -1,6 +1,7 @@
 """SQLite: найденные материалы, очередь постов, состояние каналов."""
 from __future__ import annotations
 
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -121,6 +122,13 @@ class Storage:
         return self.db.execute(
             "SELECT * FROM posts WHERE channel=? AND status='queued' ORDER BY created_ts LIMIT 1",
             (channel,)).fetchone()
+
+    def recent_headlines(self, channel: str, hours: float = 24, limit: int = 40) -> list[str]:
+        """Заголовки недавних постов канала, чтобы LLM не писала второй пост про то же событие."""
+        rows = self.db.execute(
+            "SELECT text FROM posts WHERE channel=? AND kind='news' AND status!='rejected' AND created_ts>? "
+            "ORDER BY created_ts DESC LIMIT ?", (channel, time.time() - hours * 3600, limit)).fetchall()
+        return [re.sub(r"<[^>]+>", "", r[0].split("\n", 1)[0]).strip() for r in rows]
 
     def get_post(self, post_id: int) -> sqlite3.Row | None:
         return self.db.execute("SELECT * FROM posts WHERE id=?", (post_id,)).fetchone()

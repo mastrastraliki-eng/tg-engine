@@ -25,6 +25,13 @@ def normalize_url(url: str) -> str:
     return urlunsplit(("https", host, s.path.rstrip("/"), urlencode(q), ""))
 
 
+def strip_tracking(url: str) -> str:
+    """Убирает utm-метки и прочие трекеры из ссылки, остальное не трогает."""
+    s = urlsplit(url)
+    q = [(k, v) for k, v in parse_qsl(s.query) if not TRACKING.match(k)]
+    return urlunsplit((s.scheme, s.netloc, s.path, urlencode(q), s.fragment))
+
+
 def normalize_title(title: str) -> str:
     t = re.sub(r"[^\w\s]", " ", title.lower())
     return " ".join(w for w in t.split() if len(w) > 2)
@@ -108,7 +115,8 @@ def parse_telegram(page: str, src: SourceCfg) -> list[dict]:
         post = re.search(r'data-post="([^"]+)"', b)
         if not post:
             continue
-        body = re.search(r'(?s)<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>\s*'
+        # только сам текст поста: у ответов перед ним есть цитата js-message_reply_text
+        body = re.search(r'(?s)<div class="tgme_widget_message_text js-message_text"[^>]*>(.*?)</div>\s*'
                          r'(?:<div class="tgme_widget_message_footer|<div class="tgme_widget_message_link_preview'
                          r'|<a class="tgme_widget_message_link_preview|<div class="tgme_widget_message_reply_markup)', b)
         if not body:
