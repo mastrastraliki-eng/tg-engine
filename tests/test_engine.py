@@ -28,8 +28,9 @@ RSS = f"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
 
 @pytest.fixture(autouse=True)
 def _offline(monkeypatch, tmp_path):
-    """Тесты не ходят в сеть за og:image."""
+    """Тесты не ходят в сеть за og:image и не пишут карточки в настоящую data/."""
     monkeypatch.setattr(sources, "fetch_og_image", lambda c, u: None)
+    monkeypatch.setenv("TG_CARDS_DIR", str(tmp_path))
 
 
 def make_channel(**kw):
