@@ -1,0 +1,24 @@
+[Unit]
+Description=tg-engine: сеть Telegram-каналов
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tgengine
+Group=tgengine
+WorkingDirectory=/opt/tg-engine
+Environment=PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
+ExecStart=/opt/tg-engine/.venv/bin/python -m engine run
+Restart=always
+RestartSec=15
+# Не даём движку съесть память соседнего пайплайна клипов
+MemoryMax=1G
+Nice=5
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

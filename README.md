@@ -37,7 +37,17 @@ python -m engine run                      # рабочий цикл
 python -m engine stats
 ```
 
-На сервере: `docker compose up -d --build`. База в `./data`, конфиги каналов подключены томом, новый канал = новый YAML + перезапуск.
+На сервере как служба systemd (автозапуск, перезапуск при падении, журнал в journald):
+
+```bash
+sudo bash deploy/install.sh        # из папки с кодом и .env; ставит всё в /opt/tg-engine
+journalctl -u tg-engine -f         # журнал
+sudo systemctl restart tg-engine   # после правки каналов или настроек в /opt/tg-engine
+```
+
+Повторный запуск `install.sh` обновляет код, не трогая `.env` и базу. Важно: движок должен работать в одном месте, иначе посты задвоятся.
+
+Вариант с Docker: `docker compose up -d --build`. База в `./data`, конфиги каналов подключены томом, новый канал = новый YAML + перезапуск.
 
 ## Новый канал
 
