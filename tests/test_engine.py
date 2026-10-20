@@ -278,3 +278,12 @@ def test_telegram_video_parsed():
                            '<div class="tgme_widget_message_text js-message_text" dir="auto">🟢')
     items = sources.parse_telegram(page, SourceCfg(type="telegram", channel="x"))
     assert items[1]["image"] == "video:https://cdn.t.me/v.mp4"
+
+
+def test_imagegen_falls_back_to_next_service(monkeypatch, tmp_path):
+    from engine import imagegen
+    calls = []
+    monkeypatch.setitem(imagegen.PROVIDERS, "cloudflare", lambda c, p, m: calls.append("cf"))
+    monkeypatch.setitem(imagegen.PROVIDERS, "pollinations", lambda c, p, m: calls.append("pol") or b"\xff\xd8\xffjpg")
+    path = imagegen.generate("a lighthouse", "m", tmp_path, client=object())
+    assert calls == ["cf", "pol"] and path.endswith(".jpg")

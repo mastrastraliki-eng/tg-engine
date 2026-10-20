@@ -60,9 +60,9 @@ class Engine:
         from . import imagegen
         k = f"ai_images_{date.today().isoformat()}"
         used = int(self.st.get_state("_global", k, "0"))
-        if not prompt or used >= self.s.max_ai_images_per_day or self.s.dry_run and not os.environ.get("GEMINI_API_KEY"):
+        if not prompt or used >= self.s.max_ai_images_per_day:
             return None
-        path = imagegen.generate(prompt, self.s.image_model, self.s.cards_dir)
+        path = imagegen.generate(prompt, self.s.image_model, self.s.cards_dir, providers=self.s.image_providers)
         if path:
             self.st.set_state("_global", k, str(used + 1))
         return path

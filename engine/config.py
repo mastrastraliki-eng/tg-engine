@@ -129,6 +129,7 @@ class Settings(BaseModel):
     db_path: str = "data/engine.db"
     cards_dir: str = Field(default_factory=lambda: os.environ.get("TG_CARDS_DIR", "data/cards"))
     image_model: str = "gemini-3.1-flash-image"
+    image_providers: list[str] = ["cloudflare", "pollinations", "gemini"]  # по очереди, пока один не сработает
     max_ai_images_per_day: int = 15
     channels_dir: str = "channels"
     llm_model: str = "claude-opus-5-5"
