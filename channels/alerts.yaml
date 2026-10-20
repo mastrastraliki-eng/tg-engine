@@ -19,6 +19,7 @@ sources:
   - {type: telegram, channel: GeneralStaffZSU, name: Генштаб ЗСУ,
      include_regex: "бойові втрати|оперативна інформація"}
 style:
+  images: card                    # шаблон по типу: тривога, відбій, загроза, зведення
   language: uk
   signature: ""
 filters:

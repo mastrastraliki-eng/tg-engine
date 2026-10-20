@@ -26,6 +26,12 @@ RSS = f"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
 </channel></rss>"""
 
 
+@pytest.fixture(autouse=True)
+def _offline(monkeypatch, tmp_path):
+    """Тесты не ходят в сеть за og:image."""
+    monkeypatch.setattr(sources, "fetch_og_image", lambda c, u: None)
+
+
 def make_channel(**kw):
     base = dict(id="c1", title="Test", niche="crypto", bot_token_env="T1", chat_id_env="C1",
                 mode="auto", sources=[SourceCfg(type="rss", url="https://ex.com/rss")],
@@ -40,7 +46,7 @@ class FakeBot:
     def __init__(self, token):
         self.token = token
 
-    def send_post(self, chat_id, text, image=None, reply_markup=None):
+    def send_post(self, chat_id, text, image=None, reply_markup=None, fallback_image=None):
         FakeBot.sent.append((self.token, chat_id, text))
         return len(FakeBot.sent)
 
@@ -241,3 +247,33 @@ def test_recent_headlines_passed_to_llm(monkeypatch):
     st.add_post(ch.id, "<b>Атака на Київ</b>\n\nтекст", "published")
     eng.prepare(ch)
     assert seen["recent"] == ["Атака на Київ"]
+
+
+def test_cards_render(tmp_path):
+    from PIL import Image
+    from engine import cards
+    p = cards.title_card("Атака дронів на Київ: 21 поранений 🚀", "Новини України", "#0057b7", "", tmp_path)
+    assert Image.open(p).size == (1280, 720)
+    assert cards.alert_kind("🟢 Відбій тривоги в Київська область")[0] == "clear"
+    assert cards.alert_kind("🔴 Повітряна тривога в Київська область")[0] == "alert"
+    assert cards.alert_kind("Реактивний БпЛА курсом на Луцьк")[0] == "threat"
+    a = cards.alert_card("Повітряна тривога", "x", tmp_path)
+    assert a == cards.alert_card("Повітряна тривога в Сумській", "x", tmp_path)  # шаблон переиспользуется
+
+
+def test_post_gets_card_when_source_has_no_photo(monkeypatch, tmp_path):
+    ch = make_channel()
+    eng, st = setup_engine(ch)
+    eng.s.cards_dir = str(tmp_path)
+    monkeypatch.setattr(sources, "fetch_og_image", lambda c, u: None)
+    eng.prepare(ch)
+    post = st.db.execute("SELECT image, fallback_image FROM posts").fetchone()
+    assert post["image"].endswith(".png") and post["fallback_image"] is None
+
+
+def test_telegram_video_parsed():
+    page = TG_PAGE.replace('<div class="tgme_widget_message_text js-message_text" dir="auto">🟢',
+                           '<video class="tgme_widget_message_video" src="https://cdn.t.me/v.mp4"></video>'
+                           '<div class="tgme_widget_message_text js-message_text" dir="auto">🟢')
+    items = sources.parse_telegram(page, SourceCfg(type="telegram", channel="x"))
+    assert items[1]["image"] == "video:https://cdn.t.me/v.mp4"

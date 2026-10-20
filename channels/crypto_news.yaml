@@ -22,6 +22,9 @@ schedule:
   active_hours: [8, 23]
   min_gap_minutes: 50
 style:
+  images: source_or_card
+  card_color: "#f7931a"
+  ai_images: no_photo              # ИИ-картинка, если в статье нет фото
   language: ru
   voice: "Спокойно и по сути, как опытный друг, который объясняет новость. Без хайпа и «to the moon»."
   rules:

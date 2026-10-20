@@ -5,11 +5,12 @@ import html
 import logging
 import os
 import random
+import re
 import time
 
 import httpx
 
-from . import market, sources
+from . import cards, market, sources
 from .config import ChannelCfg, Settings
 from .rewriter import BudgetExceeded, finalize
 from .schedule import day_start_ts, next_slot
@@ -35,6 +36,36 @@ class Engine:
         if token not in self._bots:
             self._bots[token] = self.bot_factory(token)
         return self._bots[token]
+
+    def images_for(self, ch: ChannelCfg, title: str, source_img: str | None) -> tuple[str | None, str | None]:
+        """(картинка, запасная картинка) по режиму канала."""
+        mode = ch.style.images
+        if mode == "none":
+            return None, None
+        if mode == "source":
+            return source_img, None
+        try:
+            card = cards.title_card(title, ch.style.card_label or ch.title, ch.style.card_color,
+                                    ch.style.signature, self.s.cards_dir, ch.schedule.timezone)
+        except Exception as e:  # картинка не должна ронять пост
+            log.warning("[%s] card failed: %s", ch.id, e)
+            card = None
+        if mode == "card" or not source_img:
+            return card, None
+        return source_img, card
+
+    def ai_image(self, prompt: str) -> str | None:
+        """ИИ-иллюстрация с дневным лимитом, чтобы не разориться."""
+        from datetime import date
+        from . import imagegen
+        k = f"ai_images_{date.today().isoformat()}"
+        used = int(self.st.get_state("_global", k, "0"))
+        if not prompt or used >= self.s.max_ai_images_per_day or self.s.dry_run and not os.environ.get("GEMINI_API_KEY"):
+            return None
+        path = imagegen.generate(prompt, self.s.image_model, self.s.cards_dir)
+        if path:
+            self.st.set_state("_global", k, str(used + 1))
+        return path
 
     def alert(self, msg: str):
         log.error("ALERT: %s", msg)
@@ -88,15 +119,28 @@ class Engine:
                 continue
             text = finalize(ch, draft.text, item.get("url"))
             status = "pending_review" if ch.mode == "review" else "queued"
-            post_id = self.st.add_post(ch.id, text, status, item_id=item["id"], image=item.get("image"))
+            src_img = item.get("image")
+            if not src_img and item.get("use_images") and item.get("url") and ch.style.images in ("source", "source_or_card"):
+                with httpx.Client(headers={"User-Agent": sources.UA}, timeout=15, follow_redirects=True) as c:
+                    src_img = sources.fetch_og_image(c, item["url"])
+            first = re.sub(r"<[^>]+>", "", draft.text.strip().split("\n", 1)[0]) or item["title"]
+            if not draft.media_ok:
+                src_img = None
+            image, fallback = self.images_for(ch, first, src_img)
+            if ch.style.ai_images == "always" or (ch.style.ai_images == "no_photo" and not src_img):
+                ai = self.ai_image(draft.image_prompt)
+                if ai:
+                    image, fallback = ai, image
+            post_id = self.st.add_post(ch.id, text, status, item_id=item["id"], image=image, fallback_image=fallback)
             self.st.set_item_status(item["id"], "used")
             if status == "pending_review":
-                self.send_for_review(ch, post_id, text, item.get("image"))
+                self.send_for_review(ch, post_id, text, image, fallback)
             ready += 1
             made += 1
         return made
 
-    def send_for_review(self, ch: ChannelCfg, post_id: int, text: str, image: str | None):
+    def send_for_review(self, ch: ChannelCfg, post_id: int, text: str, image: str | None,
+                        fallback: str | None = None):
         if self.s.dry_run or not ch.review_chat_id or not ch.bot_token:
             log.info("[%s] post %d awaits review (no review chat / dry run)", ch.id, post_id)
             return
@@ -104,7 +148,7 @@ class Engine:
                                    {"text": "❌ Отклонить", "callback_data": f"no:{post_id}"}]]}
         try:
             self.bot(ch.bot_token).send_post(ch.review_chat_id, f"[{ch.title}] #{post_id}\n\n{text}",
-                                             image, reply_markup=kb)
+                                             image, reply_markup=kb, fallback_image=fallback)
         except TelegramError as e:
             log.warning("[%s] review send failed: %s", ch.id, e)
 
@@ -193,7 +237,8 @@ class Engine:
             self.pause(ch, f"нет {ch.bot_token_env} или {ch.chat_id_env} в окружении")
             return None
         try:
-            mid = self.bot(ch.bot_token).send_post(ch.chat_id, post["text"], post["image"])
+            mid = self.bot(ch.bot_token).send_post(ch.chat_id, post["text"], post["image"],
+                                                   fallback_image=post["fallback_image"])
         except TelegramError as e:
             self.st.set_post_status(post["id"], "failed", error=str(e))
             if e.fatal:
@@ -236,10 +281,19 @@ class Engine:
         for it in self.st.new_in_order(ch.id, limit=ch.relay.max_per_poll):
             self.st.set_item_status(it["id"], "used")
             status = "pending_review" if ch.mode == "review" else "queued"
-            pid = self.st.add_post(ch.id, self.relay_text(ch, it), status, item_id=it["id"],
-                                   image=it["image"], kind="relay")
+            text = self.relay_text(ch, it)
+            image = None
+            if ch.style.images == "card":
+                try:  # шаблон по типу тревоги, рисуется один раз и дальше берётся с диска
+                    image = cards.alert_card(it["title"] + " " + (it["summary"] or ""), ch.style.card_label,
+                                             self.s.cards_dir)
+                except Exception as e:
+                    log.warning("[%s] alert card failed: %s", ch.id, e)
+            elif ch.style.images != "none":
+                image = it["image"]
+            pid = self.st.add_post(ch.id, text, status, item_id=it["id"], image=image, kind="relay")
             if status == "pending_review":
-                self.send_for_review(ch, pid, self.st.get_post(pid)["text"], it["image"])
+                self.send_for_review(ch, pid, text, image)
         for _ in range(ch.relay.max_per_poll):
             post = self.st.next_queued(ch.id)
             if not post or self.paused(ch):
@@ -271,10 +325,18 @@ class Engine:
         if ch.style.signature:
             text += "\n\n" + html.escape(ch.style.signature)
         self.st.set_state(ch.id, "summary_date", today)
+        image = None
+        if ch.style.images != "none":
+            try:
+                image = cards.market_card(coins, ch.market_summary.coins, ch.style.language,
+                                          ch.style.card_label or ch.title, ch.style.card_color,
+                                          self.s.cards_dir, ch.schedule.timezone)
+            except Exception as e:
+                log.warning("[%s] market card failed: %s", ch.id, e)
         status = "queued" if ch.market_summary.skip_review or ch.mode == "auto" else "pending_review"
-        pid = self.st.add_post(ch.id, text, status, kind="summary")
+        pid = self.st.add_post(ch.id, text, status, kind="summary", image=image)
         if status == "pending_review":
-            self.send_for_review(ch, pid, text, None)
+            self.send_for_review(ch, pid, text, image)
             return None
         return self.send(ch, self.st.get_post(pid))
 

@@ -16,7 +16,7 @@ class SourceCfg(BaseModel):
     channel: str | None = None      # для telegram: username публичного канала без @
     name: str | None = None
     weight: float = 1.0             # приоритет источника при отборе
-    use_images: bool = False        # брать картинку из источника (следи за правами)
+    use_images: bool = True         # брать картинку из источника (права у издания)
     fetch_full_text: bool = False   # скачивать страницу статьи для контекста
     include_regex: str | None = None  # брать из этого источника только совпадающие посты
 
@@ -52,6 +52,13 @@ class StyleCfg(BaseModel):
     hashtags: int = Field(0, ge=0, le=5)
     include_source_link: bool = True
     signature: str = ""             # например "@my_channel"
+    # картинки: source_or_card — фото из статьи, иначе своя карточка; card — только свои карточки;
+    # source — только фото из статьи; none — без картинок
+    images: Literal["source_or_card", "card", "source", "none"] = "source_or_card"
+    card_color: str = "#2962ff"     # цвет карточек канала
+    card_label: str = ""            # подпись на карточке; по умолчанию название канала
+    # ИИ-иллюстрации (Gemini): off; no_photo — когда в источнике нет фото; always. Не для новостей о войне.
+    ai_images: Literal["off", "no_photo", "always"] = "off"
 
 
 class FilterCfg(BaseModel):
@@ -120,6 +127,9 @@ class ChannelCfg(BaseModel):
 
 class Settings(BaseModel):
     db_path: str = "data/engine.db"
+    cards_dir: str = "data/cards"
+    image_model: str = "gemini-2.5-flash-image"
+    max_ai_images_per_day: int = 15
     channels_dir: str = "channels"
     llm_model: str = "claude-opus-5-5"
     llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"

@@ -1,7 +1,9 @@
 """Тонкий клиент Telegram Bot API."""
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import time
 
@@ -43,21 +45,46 @@ class Bot:
     def get_me(self):
         return self.call("getMe")
 
-    def send_post(self, chat_id: str, text: str, image: str | None = None, reply_markup=None) -> int:
+    def _photo(self, chat_id, photo: str, caption: str | None, reply_markup):
+        """photo: ссылка или путь к локальному файлу (свою карточку загружаем)."""
+        params = {k: v for k, v in dict(chat_id=chat_id, caption=caption, parse_mode="HTML" if caption else None,
+                                         reply_markup=reply_markup).items() if v is not None}
+        if os.path.isfile(photo):
+            if "reply_markup" in params:
+                params["reply_markup"] = json.dumps(params["reply_markup"])
+            with open(photo, "rb") as f:
+                for attempt in range(3):
+                    f.seek(0)
+                    r = self.http.post(self.base + "sendPhoto", data=params, files={"photo": f})
+                    data = r.json()
+                    if data.get("ok"):
+                        return data["result"]
+                    retry = data.get("parameters", {}).get("retry_after")
+                    if data.get("error_code") == 429 and retry and attempt < 2:
+                        time.sleep(int(retry) + 1)
+                        continue
+                    raise TelegramError(data.get("error_code", r.status_code), data.get("description", ""))
+        if photo.startswith("video:"):  # видео из поста источника: Telegram скачает его сам
+            return self.call("sendVideo", video=photo[6:], supports_streaming=True, **params)
+        return self.call("sendPhoto", photo=photo, **params)
+
+    def send_post(self, chat_id: str, text: str, image: str | None = None, reply_markup=None,
+                  fallback_image: str | None = None) -> int:
+        """Пост с картинкой. Если чужое фото не загрузилось, пробуем свою карточку, потом текст."""
         plain_len = len(re.sub(r"<[^>]+>", "", text))
-        if image and plain_len <= 1024:
+        for img in [i for i in (image, fallback_image) if i]:
             try:
-                msg = self.call("sendPhoto", chat_id=chat_id, photo=image, caption=text,
-                                parse_mode="HTML", reply_markup=reply_markup)
-                return msg["message_id"]
+                if plain_len <= 1024:
+                    return self._photo(chat_id, img, text, reply_markup)["message_id"]
+                # подпись к фото не длиннее 1024 символов: картинка отдельно, текст следом
+                self._photo(chat_id, img, None, None)
+                break
             except TelegramError as e:
                 if e.fatal:
                     raise
-                log.info("photo failed (%s), sending text", e)
+                log.info("photo failed (%s)", e)
         msg = self.call("sendMessage", chat_id=chat_id, text=text, parse_mode="HTML",
-                        link_preview_options={"is_disabled": not bool(image), "url": image} if image
-                        else {"is_disabled": True},
-                        reply_markup=reply_markup)
+                        link_preview_options={"is_disabled": True}, reply_markup=reply_markup)
         return msg["message_id"]
 
     def get_updates(self, offset: int | None):

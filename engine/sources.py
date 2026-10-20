@@ -133,8 +133,9 @@ def parse_telegram(page: str, src: SourceCfg) -> list[dict]:
                 pass
         img = None
         if src.use_images:
+            v = re.search(r'<video[^>]+src="([^"]+)"', b)
             m = re.search(r"tgme_widget_message_photo_wrap[^>]+background-image:url\('([^']+)'\)", b)
-            img = m.group(1) if m else None
+            img = "video:" + html.unescape(v.group(1)) if v else (m.group(1) if m else None)
         first = next((l.strip() for l in strip_html(rich).split("\n") if l.strip()), plain[:120])
         out.append(dict(url=f"https://t.me/{post.group(1)}", title=first[:200] or plain[:200],
                         summary=plain[:3000], body=rich, image=img, published_ts=ts))
@@ -171,6 +172,19 @@ def fetch_full_text(client: httpx.Client, url: str, limit: int = 6000) -> str:
     except Exception as e:  # статья не обязательна, хватит и анонса
         log.info("full text failed for %s: %s", url, e)
         return ""
+
+
+def fetch_og_image(client: httpx.Client, url: str) -> str | None:
+    """Главная картинка статьи из og:image, если в RSS её не было."""
+    try:
+        r = client.get(url)
+        r.raise_for_status()
+        m = (re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', r.text)
+             or re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image', r.text))
+        return html.unescape(m.group(1)) if m and m.group(1).startswith("http") else None
+    except Exception as e:
+        log.info("og:image failed for %s: %s", url, e)
+        return None
 
 
 def passes_filters(it: dict, ch: ChannelCfg) -> tuple[bool, str]:

@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS posts (
     kind TEXT NOT NULL DEFAULT 'news',    -- news | promo | relay | summary
     text TEXT NOT NULL,
     image TEXT,
+    fallback_image TEXT,                  -- своя карточка, если чужое фото не загрузится
     status TEXT NOT NULL,                 -- queued | pending_review | rejected | published | failed
     created_ts REAL NOT NULL,
     published_ts REAL,
@@ -62,6 +63,8 @@ class Storage:
         cols = {r[1] for r in self.db.execute("PRAGMA table_info(items)")}
         if "body" not in cols:
             self.db.execute("ALTER TABLE items ADD COLUMN body TEXT")
+        if "fallback_image" not in {r[1] for r in self.db.execute("PRAGMA table_info(posts)")}:
+            self.db.execute("ALTER TABLE posts ADD COLUMN fallback_image TEXT")
 
     # --- items ---
     def add_item(self, channel: str, it: dict) -> bool:
@@ -107,10 +110,11 @@ class Storage:
 
     # --- posts ---
     def add_post(self, channel: str, text: str, status: str, item_id: int | None = None,
-                 image: str | None = None, kind: str = "news") -> int:
+                 image: str | None = None, kind: str = "news", fallback_image: str | None = None) -> int:
         cur = self.db.execute(
-            "INSERT INTO posts(channel,item_id,kind,text,image,status,created_ts) VALUES(?,?,?,?,?,?,?)",
-            (channel, item_id, kind, text, image, status, time.time()))
+            "INSERT INTO posts(channel,item_id,kind,text,image,fallback_image,status,created_ts) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (channel, item_id, kind, text, image, fallback_image, status, time.time()))
         self.db.commit()
         return cur.lastrowid
 
