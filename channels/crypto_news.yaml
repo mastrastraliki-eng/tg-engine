@@ -26,8 +26,8 @@ style:
   card_color: "#f7931a"
   ai_images: always                # своя ИИ-иллюстрация к каждому посту; фото статьи — запасной вариант
   ai_style: >
-    Photorealistic cinematic editorial image, like a Bloomberg or Forbes magazine cover photo: realistic objects and
-    scenes, dramatic lighting, shallow depth of field, dark moody tones with warm orange accent light, high detail, 35mm.
+    Photorealistic cinematic editorial photograph of real objects and scenes, dramatic lighting, shallow depth of field,
+    dark moody tones with warm orange accent light, high detail, 35mm. No screens, no signs, no written words or numbers.
   language: ru
   voice: >
     Дерзко, смешно и по делу, как самый остроумный друг в крипто-чате: ирония, мемные сравнения, крипто-сленг
