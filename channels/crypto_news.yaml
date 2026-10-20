@@ -26,8 +26,8 @@ style:
   card_color: "#f7931a"
   ai_images: always                # своя ИИ-иллюстрация к каждому посту; фото статьи — запасной вариант
   ai_style: >
-    Bold vibrant 3D cartoon illustration in a consistent channel style: glossy neon orange and purple palette,
-    dark gradient background, playful exaggerated characters and objects, cinematic lighting, meme-like humor.
+    Photorealistic cinematic editorial image, like a Bloomberg or Forbes magazine cover photo: realistic objects and
+    scenes, dramatic lighting, shallow depth of field, dark moody tones with warm orange accent light, high detail, 35mm.
   language: ru
   voice: >
     Дерзко, смешно и по делу, как самый остроумный друг в крипто-чате: ирония, мемные сравнения, крипто-сленг
