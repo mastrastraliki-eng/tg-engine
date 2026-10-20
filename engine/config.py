@@ -128,7 +128,7 @@ class ChannelCfg(BaseModel):
 class Settings(BaseModel):
     db_path: str = "data/engine.db"
     cards_dir: str = "data/cards"
-    image_model: str = "gemini-2.5-flash-image"
+    image_model: str = "gemini-3.1-flash-image"
     max_ai_images_per_day: int = 15
     channels_dir: str = "channels"
     llm_model: str = "claude-opus-5-5"
