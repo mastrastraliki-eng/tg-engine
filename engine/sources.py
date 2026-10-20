@@ -90,8 +90,55 @@ def parse_reddit(data: dict, src: SourceCfg) -> list[dict]:
     return out
 
 
+def tg_html_to_text(fragment: str) -> str:
+    """HTML поста из веб-превью t.me -> разметка, которую понимает Bot API."""
+    from .rewriter import sanitize_html
+    t = re.sub(r'<i class="emoji"[^>]*>(?:<b>)?(.*?)(?:</b>)?</i>', r"\1", fragment)
+    t = re.sub(r"(?i)<br\s*/?>", "\n", t)
+    t = re.sub(r'(?is)<a\s+href="(https?://[^"]+)"[^>]*>', r'<a href="\1">', t)
+    t = re.sub(r"(?is)</?(span|div|tg-emoji|mark)[^>]*>", "", t)
+    return sanitize_html(html.unescape(t))
+
+
+def parse_telegram(page: str, src: SourceCfg) -> list[dict]:
+    """Посты публичного канала со страницы https://t.me/s/<channel>."""
+    out = []
+    blocks = re.split(r'(?=<div class="tgme_widget_message_wrap)', page)
+    for b in blocks:
+        post = re.search(r'data-post="([^"]+)"', b)
+        if not post:
+            continue
+        body = re.search(r'(?s)<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>\s*'
+                         r'(?:<div class="tgme_widget_message_footer|<div class="tgme_widget_message_link_preview'
+                         r'|<a class="tgme_widget_message_link_preview|<div class="tgme_widget_message_reply_markup)', b)
+        if not body:
+            continue
+        rich = tg_html_to_text(body.group(1))
+        plain = strip_html(rich.replace("\n", " \n "))
+        ts = None
+        dt = re.search(r'<time[^>]+datetime="([^"]+)"', b)
+        if dt:
+            from datetime import datetime
+            try:
+                ts = datetime.fromisoformat(dt.group(1)).timestamp()
+            except ValueError:
+                pass
+        img = None
+        if src.use_images:
+            m = re.search(r"tgme_widget_message_photo_wrap[^>]+background-image:url\('([^']+)'\)", b)
+            img = m.group(1) if m else None
+        first = next((l.strip() for l in strip_html(rich).split("\n") if l.strip()), plain[:120])
+        out.append(dict(url=f"https://t.me/{post.group(1)}", title=first[:200] or plain[:200],
+                        summary=plain[:3000], body=rich, image=img, published_ts=ts))
+    return out
+
+
 def fetch_source(client: httpx.Client, src: SourceCfg) -> list[dict]:
-    if src.type == "rss":
+    if src.type == "telegram":
+        r = client.get(f"https://t.me/s/{src.channel}")
+        r.raise_for_status()
+        items = parse_telegram(r.text, src)
+    elif src.type == "rss":
         r = client.get(src.url)
         r.raise_for_status()
         items = parse_rss(r.content, src)
@@ -99,6 +146,8 @@ def fetch_source(client: httpx.Client, src: SourceCfg) -> list[dict]:
         r = client.get(f"https://old.reddit.com/r/{src.subreddit}/top/.json", params={"t": "day", "limit": 25})
         r.raise_for_status()
         items = parse_reddit(r.json(), src)
+    if src.include_regex:
+        items = [it for it in items if re.search(src.include_regex, f"{it['title']} {it.get('summary', '')}", re.I | re.S)]
     for it in items:
         it.update(source=src.name, weight=src.weight, use_images=src.use_images,
                   fetch_full_text=src.fetch_full_text)
@@ -119,12 +168,16 @@ def fetch_full_text(client: httpx.Client, url: str, limit: int = 6000) -> str:
 def passes_filters(it: dict, ch: ChannelCfg) -> tuple[bool, str]:
     f = ch.filters
     text = f"{it['title']} {it.get('summary', '')}".lower()
-    if len(it["title"]) < f.min_title_len:
+    if ch.kind == "news" and len(it["title"]) < f.min_title_len:
         return False, "short title"
     if any(k.lower() in text for k in f.exclude_keywords):
         return False, "excluded keyword"
     if f.include_keywords and not any(k.lower() in text for k in f.include_keywords):
         return False, "no include keyword"
+    if f.include_regex and not re.search(f.include_regex, text, re.I | re.S):
+        return False, "no include regex"
+    if f.exclude_regex and re.search(f.exclude_regex, text, re.I | re.S):
+        return False, "excluded regex"
     return True, ""
 
 
@@ -141,7 +194,7 @@ def ingest(items: list[dict], ch: ChannelCfg, storage, dup_threshold: float = 0.
         ok, reason = passes_filters(it, ch)
         if not ok:
             it.update(status="rejected", reason=reason)
-        elif any(similarity(it["title_norm"], t) >= dup_threshold for t in recent):
+        elif ch.kind == "news" and any(similarity(it["title_norm"], t) >= dup_threshold for t in recent):
             it.update(status="duplicate", reason="similar title")
         if storage.add_item(ch.id, it) and it.get("status", "new") == "new":
             recent.append(it["title_norm"])

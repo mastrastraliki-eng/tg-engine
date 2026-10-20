@@ -10,13 +10,15 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class SourceCfg(BaseModel):
-    type: Literal["rss", "reddit"]
+    type: Literal["rss", "reddit", "telegram"]
     url: str | None = None          # для rss
     subreddit: str | None = None    # для reddit
+    channel: str | None = None      # для telegram: username публичного канала без @
     name: str | None = None
     weight: float = 1.0             # приоритет источника при отборе
     use_images: bool = False        # брать картинку из источника (следи за правами)
     fetch_full_text: bool = False   # скачивать страницу статьи для контекста
+    include_regex: str | None = None  # брать из этого источника только совпадающие посты
 
     @model_validator(mode="after")
     def _check(self):
@@ -24,8 +26,13 @@ class SourceCfg(BaseModel):
             raise ValueError("rss source needs url")
         if self.type == "reddit" and not self.subreddit:
             raise ValueError("reddit source needs subreddit")
+        if self.type == "telegram":
+            if not self.channel:
+                raise ValueError("telegram source needs channel")
+            self.channel = self.channel.lstrip("@")
         if not self.name:
-            self.name = self.url if self.type == "rss" else f"r/{self.subreddit}"
+            self.name = {"rss": self.url, "reddit": f"r/{self.subreddit}",
+                         "telegram": f"@{self.channel}"}[self.type]
         return self
 
 
@@ -50,6 +57,8 @@ class StyleCfg(BaseModel):
 class FilterCfg(BaseModel):
     include_keywords: list[str] = []   # если не пусто, нужен хотя бы один
     exclude_keywords: list[str] = []
+    include_regex: str | None = None   # если задано, текст должен совпасть
+    exclude_regex: str | None = None
     max_age_hours: int = 36
     min_title_len: int = 15
 
@@ -60,9 +69,17 @@ class PromoCfg(BaseModel):
     partners: list[str] = []            # id других каналов сети
 
 
+class RelayCfg(BaseModel):
+    """kind: relay — дословный репост официальных источников сразу после выхода, без LLM."""
+    poll_seconds: int = Field(30, ge=10)
+    attribution: bool = True            # подпись «Джерело: @канал»
+    max_per_poll: int = Field(10, ge=1, le=30)
+
+
 class ChannelCfg(BaseModel):
     id: str
     title: str
+    kind: Literal["news", "relay"] = "news"
     enabled: bool = True
     username: str = ""                  # @handle, нужен для взаимного пиара
     niche: str
@@ -75,6 +92,7 @@ class ChannelCfg(BaseModel):
     style: StyleCfg = StyleCfg()
     filters: FilterCfg = FilterCfg()
     promo: PromoCfg = PromoCfg()
+    relay: RelayCfg = RelayCfg()
     queue_target: int = 3               # сколько готовых постов держать в очереди
 
     @property

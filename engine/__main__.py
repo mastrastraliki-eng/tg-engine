@@ -76,6 +76,17 @@ def main(argv=None):
         ch.mode = "auto"
         s.dry_run = True
         eng = Engine(s, channels, st, FakeRewriter() if a.fake else Rewriter(s, st))
+        if ch.kind == "relay":
+            from . import sources
+            print(f"собрано новых материалов: {sources.collect(ch, st)}")
+            rows = st.db.execute("SELECT * FROM items WHERE channel=? AND status='new' "
+                                 "ORDER BY COALESCE(published_ts, fetched_ts) DESC LIMIT ?", (ch.id, a.n)).fetchall()
+            for row in reversed(rows):
+                print("─" * 60 + f"\n{eng.relay_text(ch, row)}\n")
+            for row in st.db.execute("SELECT title, reason FROM items WHERE channel=? AND status='rejected' "
+                                     "AND reason NOT IN ('too old') LIMIT 5", (ch.id,)):
+                print(f"✗ {row['title'][:70]} — {row['reason']}")
+            return 0
         print(f"собрано новых материалов: {eng.collect(ch)}")
         eng.prepare(ch)
         for row in st.db.execute("SELECT * FROM posts WHERE channel=?", (ch.id,)):

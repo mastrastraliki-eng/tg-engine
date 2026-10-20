@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS items (
     title_norm TEXT NOT NULL,
     url TEXT,
     summary TEXT,
+    body TEXT,
     image TEXT,
     source TEXT,
     weight REAL DEFAULT 1,
@@ -57,14 +58,17 @@ class Storage:
         self.db = sqlite3.connect(path)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(items)")}
+        if "body" not in cols:
+            self.db.execute("ALTER TABLE items ADD COLUMN body TEXT")
 
     # --- items ---
     def add_item(self, channel: str, it: dict) -> bool:
         cur = self.db.execute(
-            """INSERT OR IGNORE INTO items(channel,key,title,title_norm,url,summary,image,source,
+            """INSERT OR IGNORE INTO items(channel,key,title,title_norm,url,summary,body,image,source,
                weight,use_images,fetch_full_text,published_ts,fetched_ts,status,reason)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (channel, it["key"], it["title"], it["title_norm"], it.get("url"), it.get("summary"),
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (channel, it["key"], it["title"], it["title_norm"], it.get("url"), it.get("summary"), it.get("body"),
              it.get("image"), it.get("source"), it.get("weight", 1.0), int(it.get("use_images", False)),
              int(it.get("fetch_full_text", False)), it.get("published_ts"), time.time(),
              it.get("status", "new"), it.get("reason")),
@@ -77,6 +81,12 @@ class Storage:
             "SELECT title_norm FROM items WHERE channel=? AND fetched_ts>? AND status!='duplicate'",
             (channel, time.time() - hours * 3600)).fetchall()
         return [r[0] for r in rows]
+
+    def new_in_order(self, channel: str, limit: int = 50) -> list[sqlite3.Row]:
+        """Для relay: новые материалы в порядке выхода."""
+        return self.db.execute(
+            "SELECT * FROM items WHERE channel=? AND status='new' "
+            "ORDER BY COALESCE(published_ts, fetched_ts), id LIMIT ?", (channel, limit)).fetchall()
 
     def candidates(self, channel: str, limit: int = 20) -> list[sqlite3.Row]:
         return self.db.execute(

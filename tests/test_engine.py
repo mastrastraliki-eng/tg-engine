@@ -157,6 +157,43 @@ def test_daily_cap(monkeypatch):
 
 def test_example_configs_load():
     chs = load_channels("channels")
-    assert {"crypto_news", "ai_tools", "wow_facts"} <= set(chs)
+    assert {"crypto_news", "ua_news", "alerts"} <= set(chs)
     tokens = [c.bot_token_env for c in chs.values()]
     assert len(tokens) == len(set(tokens)), "у каждого канала свой бот"
+
+
+TG_PAGE = """
+<div class="tgme_widget_message_wrap js-widget_message_wrap"><div class="tgme_widget_message" data-post="air_alert_ua/101">
+<div class="tgme_widget_message_text js-message_text" dir="auto"><i class="emoji" style="x"><b>🔴</b></i> <b>22:31 Повітряна тривога в Київська область.</b><br/>Слідкуйте за подальшими повідомленнями.<br/><a href="?q=%23%D0%9A">#Київська_область</a></div>
+<div class="tgme_widget_message_footer compact js-message_footer"><time datetime="2026-10-20T19:31:00+00:00" class="time">22:31</time></div></div></div>
+<div class="tgme_widget_message_wrap js-widget_message_wrap"><div class="tgme_widget_message" data-post="air_alert_ua/102">
+<div class="tgme_widget_message_text js-message_text" dir="auto">🟢 22:50 Відбій тривоги в Київська область.</div>
+<div class="tgme_widget_message_footer compact js-message_footer"><time datetime="2026-10-20T19:50:00+00:00" class="time">22:50</time></div></div></div>
+"""
+
+
+def test_parse_telegram_page():
+    src = SourceCfg(type="telegram", channel="@air_alert_ua")
+    items = sources.parse_telegram(TG_PAGE, src)
+    assert [i["url"] for i in items] == ["https://t.me/air_alert_ua/101", "https://t.me/air_alert_ua/102"]
+    assert items[0]["body"].startswith("🔴 <b>22:31 Повітряна тривога в Київська область.</b>\nСлідкуйте")
+    assert items[0]["title"].startswith("🔴 22:31 Повітряна тривога")
+
+
+def test_relay_skips_history_then_posts_verbatim(monkeypatch):
+    monkeypatch.setenv("T1", "tok1")
+    monkeypatch.setenv("C1", "@alerts")
+    FakeBot.sent.clear()
+    ch = make_channel(kind="relay", sources=[SourceCfg(type="telegram", channel="air_alert_ua", name="Повітряна тривога")],
+                      filters={"max_age_hours": 100000}, style={"language": "uk"})
+    st = Storage(":memory:")
+    eng = Engine(Settings(), {ch.id: ch}, st, FakeRewriter(), bot_factory=FakeBot)
+    page = {"html": TG_PAGE}
+    monkeypatch.setattr(sources, "fetch_source", lambda c, s: sources.parse_telegram(page["html"], s) and
+                        [dict(it, source=s.name, weight=1) for it in sources.parse_telegram(page["html"], s)])
+    assert eng.relay(ch) == 0 and FakeBot.sent == []          # старые посты не публикуем
+    page["html"] = TG_PAGE.replace("air_alert_ua/102", "air_alert_ua/103").replace("22:50", "23:10")
+    assert eng.relay(ch) == 1
+    text = FakeBot.sent[0][2]
+    assert text.startswith("🟢 23:10 Відбій тривоги в Київська область.")
+    assert 'Джерело: <a href="https://t.me/air_alert_ua/103">Повітряна тривога</a>' in text

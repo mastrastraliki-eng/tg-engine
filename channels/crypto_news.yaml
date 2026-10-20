@@ -1,6 +1,6 @@
 id: crypto_news
 title: "Крипто Пульс"
-username: "@crypto_puls_ua"          # замени на реальный
+username: ""                          # впиши @username, когда канал станет публичным
 niche: >
   Новини криптовалют і блокчейну: ринок BTC/ETH, регулювання, великі угоди, біржі,
   злами та безпека. Для людей, які тримають крипту, а не для трейдерів-скальперів.
@@ -28,11 +28,11 @@ style:
   max_chars: 800
   hashtags: 1
   include_source_link: true
-  signature: "@crypto_puls_ua"
+  signature: ""
 filters:
   exclude_keywords: ["sponsored", "press release", "партнерський матеріал", "presale"]
   max_age_hours: 24
 promo:
   enabled: true
   every_days: 5
-  partners: [ai_tools]
+  partners: [ua_news]

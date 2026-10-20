@@ -1,6 +1,7 @@
 """Оркестратор: сбор → переписывание → модерация → публикация по расписанию."""
 from __future__ import annotations
 
+import html
 import logging
 import os
 import random
@@ -142,7 +143,8 @@ class Engine:
 
     def promo_due(self, ch: ChannelCfg, now: float) -> bool:
         p = ch.promo
-        if not p.enabled or not p.partners:
+        # у приватного канала нет @username, рекламировать его нечем
+        if not p.enabled or not any(self.channels[x].username for x in p.partners):
             return False
         last = self.st.last_published_ts(ch.id, kind="promo") or 0
         # промо не чаще раза в every_days и не раньше, чем выйдет хотя бы 5 обычных постов
@@ -164,7 +166,8 @@ class Engine:
 
         post = None
         if self.promo_due(ch, now):
-            partner = self.channels[self.rng.choice(ch.promo.partners)]
+            partner = self.channels[self.rng.choice([x for x in ch.promo.partners
+                                                     if self.channels[x].username])]
             try:
                 text = self.rw.promo(ch, partner)
             except Exception as e:
@@ -204,10 +207,62 @@ class Engine:
         log.info("[%s] published post %d as message %s", ch.id, post["id"], mid)
         return mid
 
+    # --- relay: дословный репост официальных источников ---
+    def relay_text(self, ch: ChannelCfg, item) -> str:
+        parts = [(item["body"] or html.escape(item["summary"] or item["title"]))[:3700]]
+        tail = []
+        if ch.relay.attribution and item["source"]:
+            label = "Джерело" if ch.style.language == "uk" else "Источник"
+            tail.append(f'{label}: <a href="{html.escape(item["url"])}">{html.escape(item["source"])}</a>')
+        if ch.style.signature:
+            tail.append(html.escape(ch.style.signature))
+        if tail:
+            parts.append(" · ".join(tail))
+        return "\n\n".join(parts)
+
+    def relay(self, ch: ChannelCfg) -> int:
+        sources.collect(ch, self.st)
+        if not self.st.get_state(ch.id, "primed"):
+            # первый запуск: не вываливаем в канал всю историю источника
+            for it in self.st.new_in_order(ch.id, limit=1000):
+                self.st.set_item_status(it["id"], "rejected", "before start")
+            self.st.set_state(ch.id, "primed", "1")
+            return 0
+        # тревога, которая не ушла за 10 минут, уже неактуальна
+        self.st.db.execute("UPDATE posts SET status='rejected', error='stale' WHERE channel=? "
+                           "AND status='queued' AND created_ts<?", (ch.id, time.time() - 600))
+        self.st.db.commit()
+        sent = 0
+        for it in self.st.new_in_order(ch.id, limit=ch.relay.max_per_poll):
+            self.st.set_item_status(it["id"], "used")
+            status = "pending_review" if ch.mode == "review" else "queued"
+            pid = self.st.add_post(ch.id, self.relay_text(ch, it), status, item_id=it["id"],
+                                   image=it["image"], kind="relay")
+            if status == "pending_review":
+                self.send_for_review(ch, pid, self.st.get_post(pid)["text"], it["image"])
+        for _ in range(ch.relay.max_per_poll):
+            post = self.st.next_queued(ch.id)
+            if not post or self.paused(ch):
+                break
+            if self.send(ch, post) is not None:
+                sent += 1
+            else:
+                break
+        return sent
+
     def tick(self, now: float | None = None):
         now = now or time.time()
         for ch in self.channels.values():
             if not ch.enabled or self.paused(ch):
+                continue
+            if ch.kind == "relay":
+                last = float(self.st.get_state(ch.id, "last_collect", "0"))
+                if now - last >= ch.relay.poll_seconds:
+                    self.st.set_state(ch.id, "last_collect", str(now))
+                    try:
+                        self.relay(ch)
+                    except Exception as e:
+                        log.exception("[%s] relay crashed: %s", ch.id, e)
                 continue
             last = float(self.st.get_state(ch.id, "last_collect", "0"))
             if now - last >= self.s.collect_every_minutes * 60:
@@ -221,7 +276,7 @@ class Engine:
         except Exception as e:
             log.exception("review poll crashed: %s", e)
         for ch in self.channels.values():
-            if ch.enabled:
+            if ch.enabled and ch.kind == "news":
                 try:
                     self.publish_due(ch, now)
                 except Exception as e:
@@ -229,6 +284,8 @@ class Engine:
 
     def run_forever(self):
         log.info("engine started: %d channels, dry_run=%s", len(self.channels), self.s.dry_run)
+        polls = [c.relay.poll_seconds for c in self.channels.values() if c.enabled and c.kind == "relay"]
+        sleep = min([self.s.tick_seconds, *polls])
         while True:
             self.tick()
-            time.sleep(self.s.tick_seconds)
+            time.sleep(sleep)

@@ -1,0 +1,25 @@
+id: alerts
+title: "Тривоги та зведення"
+kind: relay                           # дословно и сразу, без нейросети
+username: ""
+niche: "Повітряні тривоги по Україні та офіційні військові зведення"
+bot_token_env: ALERTS_BOT_TOKEN
+chat_id_env: ALERTS_CHAT_ID
+mode: auto                            # тревоги нельзя ждать на модерации
+relay:
+  poll_seconds: 20
+  attribution: true
+  max_per_poll: 15
+sources:
+  # Официальный канал приложения «Повітряна тривога»
+  - {type: telegram, channel: air_alert_ua, name: Повітряна тривога}
+  # Повітряні сили ЗСУ: предупреждения об угрозах
+  - {type: telegram, channel: kpszsu, name: Повітряні сили ЗСУ}
+  # Генштаб: только ежедневные потери врага и оперативная информация
+  - {type: telegram, channel: GeneralStaffZSU, name: Генштаб ЗСУ,
+     include_regex: "бойові втрати|оперативна інформація"}
+style:
+  language: uk
+  signature: ""
+filters:
+  max_age_hours: 2
