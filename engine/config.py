@@ -152,6 +152,7 @@ class Settings(BaseModel):
     alert_bot_token_env: str | None = "ALERT_BOT_TOKEN"
     seed_once: str = ""                 # новая метка = разовое стартовое наполнение каналов при запуске
     seed_posts: int = 5
+    seed_channels: list[str] = []  # пусто = все каналы
 
 
 def load_settings(path: str | Path = "settings.yaml") -> Settings:

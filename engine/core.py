@@ -475,7 +475,7 @@ class Engine:
         health.install()
         if self.s.seed_once and self.st.get_state("_seed", "done") != self.s.seed_once:
             for ch in self.channels.values():
-                if ch.enabled:
+                if ch.enabled and (not self.s.seed_channels or ch.id in self.s.seed_channels):
                     self.seed(ch, self.s.seed_posts)
             self.st.set_state("_seed", "done", self.s.seed_once)
             log.info("seed %s: %d posts per channel", self.s.seed_once, self.s.seed_posts)

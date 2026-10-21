@@ -42,7 +42,7 @@ $script = @(
     'bash deploy/install.sh; echo "install.sh exit: $?"'
     'echo; echo "==== waiting 30s"; sleep 30'
     'echo "service: $(systemctl is-active tg-engine)"'
-    'journalctl -u tg-engine -n 25 --no-pager'
+    'journalctl -u tg-engine -n 40 --no-pager'
     'echo; echo "==== report"; cd /opt/tg-engine && sudo -u tgengine .venv/bin/python -m engine health --send; cd /'
     'rm -rf /root/tg-engine-src /tmp/tg-engine /tmp/tg-engine-update.tgz /tmp/tg-update.sh'
     'echo "cleanup done"'
