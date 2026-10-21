@@ -93,7 +93,10 @@ def build_report(eng, now: float | None = None, client: httpx.Client | None = No
                 d = subs - int(prev)
                 delta = f" ({d:+d})"
             st.set_state(ch.id, "health_subs", str(subs))
-        lines.append(f"{name}: постов за сутки {posts}, подписчиков {subs if subs is not None else '?'}{delta}")
+        made = st.db.execute("SELECT COUNT(*) FROM posts WHERE channel=? AND created_ts>=?",
+                             (ch.id, now - 86400)).fetchone()[0]
+        lines.append(f"{name}: вышло за сутки {posts} (подготовлено {made}), "
+                     f"подписчиков {subs if subs is not None else '?'}{delta}")
         if eng.paused(ch):
             problems.append(f"{name} на паузе: {eng.paused(ch)}")
         if posts == 0:
@@ -106,6 +109,7 @@ def build_report(eng, now: float | None = None, client: httpx.Client | None = No
         if close:
             client.close()
     used, limit = st.llm_calls_last_day(), eng.s.max_llm_calls_per_day
+    lines.append(f"запросов к Claude за сутки: {used} из {limit} ({eng.s.llm_model})")
     if used >= limit * 0.9:
         problems.append(f"лимит запросов к Claude почти исчерпан: {used}/{limit}")
     if errors.count:

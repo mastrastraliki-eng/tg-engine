@@ -1,7 +1,6 @@
 id: alerts
 title: "🛡 Вартовий неба | Тривоги"
 kind: relay                           # дословно и сразу, без нейросети
-enabled: false                        # пока на паузе: слишком много постов
 username: "vartovyi_neba_ua"
 niche: "Повітряні тривоги по Україні та офіційні військові зведення"
 bot_token_env: ALERTS_BOT_TOKEN

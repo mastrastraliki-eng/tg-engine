@@ -339,7 +339,7 @@ def test_health_report_once_a_day(monkeypatch):
     assert health.daily(eng, morning)
     assert not health.daily(eng, morning + 600)       # второй раз в тот же день не шлёт
     sent = [p["text"] for t, m, p in calls if m == "sendMessage"]
-    assert len(sent) == 1 and "⚠" in sent[0] and "ни одного поста" in sent[0] and "подписчиков 7" in sent[0]
+    assert len(sent) == 1 and "⚠" in sent[0] and "ни одного поста" in sent[0] and "подписчиков 7" in sent[0] and "запросов к Claude" in sent[0]
     st.add_post(ch.id, "p", "queued")
     st.set_post_status(st.next_queued(ch.id)["id"], "published")
     text = health.build_report(eng)
