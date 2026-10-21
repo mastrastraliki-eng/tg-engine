@@ -377,3 +377,16 @@ def test_relay_seed_replays_only_fresh_summaries(monkeypatch):
     monkeypatch.setattr(sources, "collect", lambda c, s: 0)
     eng.seed(ch, 5)
     assert len(st.get_state(ch.id, "seed_items").split(",")) == 2   # тревоги из @a не повторяем
+
+
+def test_no_preparing_at_night(monkeypatch):
+    ch = make_channel(schedule={"active_hours": [7, 22]})
+    eng, st = setup_engine(ch)
+    called = []
+    monkeypatch.setattr(eng, "collect", lambda c: called.append("c"))
+    monkeypatch.setattr(eng, "prepare", lambda c: called.append("p"))
+    tz = ZoneInfo("Europe/Kyiv")
+    eng.tick(datetime(2026, 10, 21, 2, 0, tzinfo=tz).timestamp())
+    assert called == []
+    eng.tick(datetime(2026, 10, 21, 6, 30, tzinfo=tz).timestamp())   # за час до начала уже готовим
+    assert called == ["c", "p"]

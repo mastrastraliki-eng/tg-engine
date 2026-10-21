@@ -9,7 +9,7 @@ bot_token_env: NEWS_BOT_TOKEN
 chat_id_env: NEWS_CHAT_ID
 mode: auto                            # публикует сам, без ✅/❌
 review_chat_id_env: REVIEW_CHAT_ID
-queue_target: 4
+queue_target: 2
 sources:
   - {type: rss, url: "https://www.ukrinform.ua/rss/block-lastnews", name: Укрінформ, weight: 1.2}
   - {type: rss, url: "https://www.pravda.com.ua/rss/view_news/", name: Українська правда, weight: 1.2}
@@ -19,9 +19,9 @@ sources:
   - {type: telegram, channel: V_Zelenskiy_official, name: Володимир Зеленський, weight: 1.3}
   - {type: telegram, channel: GeneralStaffZSU, name: Генштаб ЗСУ, weight: 1.1}
 schedule:
-  posts_per_day: 14
-  active_hours: [7, 24]
-  min_gap_minutes: 35
+  posts_per_day: 8
+  active_hours: [7, 22]             # с 7:00 до 22:00 по Киеву, ночью тишина
+  min_gap_minutes: 60
 style:
   images: source_or_card          # настоящие фото/видео из источника, иначе карточка с заголовком
   card_color: "#0057b7"

@@ -8,7 +8,7 @@ bot_token_env: CRYPTO_BOT_TOKEN
 chat_id_env: CRYPTO_CHAT_ID
 mode: auto                            # стиль утверждён, крипта идёт сама
 review_chat_id_env: REVIEW_CHAT_ID
-queue_target: 3
+queue_target: 2
 sources:
   - {type: rss, url: "https://forklog.com/feed", name: ForkLog, weight: 1.2}
   - {type: rss, url: "https://incrypted.com/feed/", name: Incrypted, weight: 1.2}
@@ -18,9 +18,9 @@ sources:
   - {type: rss, url: "https://cointelegraph.com/rss", name: Cointelegraph}
   - {type: rss, url: "https://decrypt.co/feed", name: Decrypt, weight: 0.9}
 schedule:
-  posts_per_day: 7
-  active_hours: [8, 23]
-  min_gap_minutes: 50
+  posts_per_day: 5
+  active_hours: [7, 22]             # с 7:00 до 22:00 по Киеву, ночью тишина
+  min_gap_minutes: 90
 style:
   images: source_or_card
   card_color: "#f7931a"

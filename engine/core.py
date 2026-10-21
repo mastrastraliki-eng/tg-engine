@@ -7,13 +7,15 @@ import os
 import random
 import re
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 
 from . import cards, health, market, sources
 from .config import ChannelCfg, Settings
 from .rewriter import BudgetExceeded, finalize
-from .schedule import day_start_ts, next_slot
+from .schedule import day_start_ts, in_active_hours, next_slot
 from .telegram import Bot, TelegramError
 
 log = logging.getLogger(__name__)
@@ -419,7 +421,9 @@ class Engine:
                         log.exception("[%s] relay crashed: %s", ch.id, e)
                 continue
             last = float(self.st.get_state(ch.id, "last_collect", "0"))
-            if now - last >= self.s.collect_every_minutes * 60:
+            # ночью не готовим посты: к утру они устареют, а вызовы Claude уже потрачены
+            soon = datetime.fromtimestamp(now + 3600, ZoneInfo(ch.schedule.timezone))
+            if now - last >= self.s.collect_every_minutes * 60 and in_active_hours(soon, ch.schedule):
                 try:
                     self.collect(ch)
                     self.prepare(ch)
