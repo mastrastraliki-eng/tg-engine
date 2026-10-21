@@ -364,15 +364,6 @@ def test_seed_publishes_burst_then_normal(monkeypatch):
     assert len(FakeBot.sent) == 3
 
 
-def test_seed_at_night_waits_for_morning():
-    ch = make_channel()
-    eng, st = setup_engine(ch)
-    night = datetime(2026, 10, 21, 3, 0, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
-    eng.seed(ch, 5, night)
-    start = datetime.fromtimestamp(float(st.get_state(ch.id, "seed_next")), ZoneInfo("Europe/Kyiv"))
-    assert start.hour >= 8 and start.day == 21
-
-
 def test_relay_seed_replays_only_fresh_summaries(monkeypatch):
     ch = make_channel(kind="relay", sources=[SourceCfg(type="telegram", channel="a"),
                                              SourceCfg(type="telegram", channel="gs", include_regex="втрати")])

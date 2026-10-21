@@ -7,15 +7,13 @@ import os
 import random
 import re
 import time
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 import httpx
 
 from . import cards, health, market, sources
 from .config import ChannelCfg, Settings
 from .rewriter import BudgetExceeded, finalize
-from .schedule import day_start_ts, in_active_hours, next_slot
+from .schedule import day_start_ts, next_slot
 from .telegram import Bot, TelegramError
 
 log = logging.getLogger(__name__)
@@ -215,10 +213,8 @@ class Engine:
     # --- стартовое наполнение: несколько постов подряд, чтобы новый подписчик видел живую ленту ---
     def seed(self, ch: ChannelCfg, n: int, now: float | None = None):
         now = now or time.time()
-        start = now if in_active_hours(datetime.fromtimestamp(now, ZoneInfo(ch.schedule.timezone)), ch.schedule) \
-            else next_slot(now, ch.schedule, self.rng)
         self.st.set_state(ch.id, "seed_left", str(n))
-        self.st.set_state(ch.id, "seed_next", str(start))
+        self.st.set_state(ch.id, "seed_next", str(now))  # сразу, даже ночью: каналы только запускаются
         if ch.kind == "relay":
             # тревоги задним числом не нужны: только свежие сводки из фильтрованных источников (Генштаб)
             names = [src.name for src in ch.sources if src.include_regex]
