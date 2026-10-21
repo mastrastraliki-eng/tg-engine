@@ -1,8 +1,12 @@
 db_path: data/engine.db
 channels_dir: channels
-llm_model: claude-sonnet-5-5    # дешевле Opus, тексты почти те же; ещё дешевле: claude-haiku-5-5
+# Тексты пишут бесплатные ИИ по очереди; кончился лимит одного ключа, берётся следующий.
+# Если не отвечает ни один, пост собирается по шаблону без ИИ. Платный Claude отключён
+# (чтобы вернуть, добавь anthropic перед template).
+llm_providers: [groq, gemini, cloudflare, openrouter, template]
+llm_model: claude-sonnet-5-5    # используется, только если в списке есть anthropic
 llm_effort: low
-max_llm_calls_per_day: 150      # предохранитель от счёта за API
+max_llm_calls_per_day: 400      # предохранитель от зацикливания
 tick_seconds: 60
 collect_every_minutes: 30
 dry_run: false

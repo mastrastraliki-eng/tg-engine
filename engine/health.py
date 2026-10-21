@@ -44,11 +44,30 @@ def report_due(st, now: float) -> bool:
     return dt.hour >= REPORT_HOUR and st.get_state("_health", "last_day") != dt.strftime("%Y-%m-%d")
 
 
-def _check_keys(client: httpx.Client) -> list[str]:
-    """Бесплатные запросы: список моделей Anthropic и проверка токена Cloudflare."""
+def llm_line(eng) -> tuple[str, list[str]]:
+    """Какие бесплатные ключи ИИ есть и какие сейчас в лимите."""
+    from . import llm
+    parts, bad, now = [], [], time.time()
+    for name in eng.s.llm_providers:
+        if name not in llm.PROVIDERS:
+            continue
+        ks = llm.keys(llm.PROVIDERS[name][1])
+        if not ks:
+            continue
+        busy = sum(1 for i in range(len(ks)) if float(eng.st.get_state("_llm", f"{name}#{i}") or 0) > now)
+        parts.append(f"{name} {len(ks) - busy}/{len(ks)}")
+    if not parts:
+        bad.append("нет ни одного бесплатного ключа ИИ: посты идут по шаблону")
+    elif all(p.split()[1].startswith("0/") for p in parts):
+        bad.append("все ключи ИИ сейчас в лимите: посты идут по шаблону")
+    return "ключи ИИ (рабочие/всего): " + (", ".join(parts) or "нет"), bad
+
+
+def _check_keys(client: httpx.Client, paid: bool = False) -> list[str]:
+    """Бесплатные запросы: список моделей Anthropic (если он включён) и проверка токена Cloudflare."""
     bad = []
     key = os.environ.get("ANTHROPIC_API_KEY")
-    if key:
+    if paid and key:
         try:
             r = client.get("https://api.anthropic.com/v1/models", params={"limit": 1},
                            headers={"x-api-key": key, "anthropic-version": "2023-06-01"})
@@ -56,7 +75,7 @@ def _check_keys(client: httpx.Client) -> list[str]:
                 bad.append(f"ключ Anthropic не отвечает ({r.status_code})")
         except httpx.HTTPError as e:
             bad.append(f"Anthropic недоступен ({type(e).__name__})")
-    else:
+    elif paid:
         bad.append("нет ключа Anthropic")
     token = os.environ.get("CLOUDFLARE_API_TOKEN")
     if token:
@@ -104,14 +123,17 @@ def build_report(eng, now: float | None = None, client: httpx.Client | None = No
     close = client is None
     client = client or httpx.Client(timeout=20)
     try:
-        problems += _check_keys(client)
+        problems += _check_keys(client, "anthropic" in eng.s.llm_providers)
     finally:
         if close:
             client.close()
     used, limit = st.llm_calls_last_day(), eng.s.max_llm_calls_per_day
-    lines.append(f"запросов к Claude за сутки: {used} из {limit} ({eng.s.llm_model})")
+    lines.append(f"запросов к ИИ за сутки: {used} из {limit}")
+    line, bad = llm_line(eng)
+    lines.append(line)
+    problems += bad
     if used >= limit * 0.9:
-        problems.append(f"лимит запросов к Claude почти исчерпан: {used}/{limit}")
+        problems.append(f"суточный предохранитель запросов почти исчерпан: {used}/{limit}")
     if errors.count:
         problems.append(f"ошибок в журнале: {errors.count}, последняя: {errors.last}")
     head = "✅ Всё работает" if not problems else "⚠ Есть проблемы"

@@ -30,7 +30,7 @@ RSS = f"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
 def _offline(monkeypatch, tmp_path):
     """Тесты не ходят в сеть за og:image и не пишут карточки в настоящую data/."""
     monkeypatch.setattr(sources, "fetch_og_image", lambda c, u: None)
-    monkeypatch.setattr(health, "_check_keys", lambda c: [])
+    monkeypatch.setattr(health, "_check_keys", lambda c, paid=False: [])
     monkeypatch.setenv("TG_CARDS_DIR", str(tmp_path))
 
 
@@ -268,7 +268,7 @@ def test_post_gets_card_when_source_has_no_photo(monkeypatch, tmp_path):
     eng, st = setup_engine(ch)
     eng.s.cards_dir = str(tmp_path)
     monkeypatch.setattr(sources, "fetch_og_image", lambda c, u: None)
-    monkeypatch.setattr(health, "_check_keys", lambda c: [])
+    monkeypatch.setattr(health, "_check_keys", lambda c, paid=False: [])
     eng.prepare(ch)
     post = st.db.execute("SELECT image, fallback_image FROM posts").fetchone()
     assert post["image"].endswith(".png") and post["fallback_image"] is None
@@ -320,6 +320,7 @@ def test_editor_picks_and_polishes():
 
 
 def test_health_report_once_a_day(monkeypatch):
+    monkeypatch.setenv("GROQ_API_KEY", "g")
     monkeypatch.setenv("T1", "tok1")
     monkeypatch.setenv("C1", "@chan")
     monkeypatch.setenv("AB", "alerttok")
@@ -339,7 +340,7 @@ def test_health_report_once_a_day(monkeypatch):
     assert health.daily(eng, morning)
     assert not health.daily(eng, morning + 600)       # второй раз в тот же день не шлёт
     sent = [p["text"] for t, m, p in calls if m == "sendMessage"]
-    assert len(sent) == 1 and "⚠" in sent[0] and "ни одного поста" in sent[0] and "подписчиков 7" in sent[0] and "запросов к Claude" in sent[0]
+    assert len(sent) == 1 and "⚠" in sent[0] and "ни одного поста" in sent[0] and "подписчиков 7" in sent[0] and "запросов к ИИ" in sent[0]
     st.add_post(ch.id, "p", "queued")
     st.set_post_status(st.next_queued(ch.id)["id"], "published")
     text = health.build_report(eng)
@@ -397,3 +398,41 @@ def test_repeat_headline_detected():
     recent = ["15 років за спробу підірвати залізницю"]
     assert is_repeat("Суд дав 15 років чоловіку, який намагався підірвати залізницю", recent)
     assert not is_repeat("Україна отримала від США нові ракети", ["Росія атакувала Україну дронами вночі"])
+
+
+def test_free_llm_rotates_keys(monkeypatch):
+    import httpx
+    from engine.llm import FreeLLM
+    monkeypatch.setenv("GROQ_API_KEY", "g1,g2")
+    monkeypatch.setenv("GEMINI_API_KEY", "m1")
+    seen = []
+
+    def handler(req):
+        key = req.headers["authorization"].split()[1]
+        seen.append(key)
+        if key == "g1":
+            return httpx.Response(429, text="daily limit")
+        if key == "g2":
+            return httpx.Response(401, text="bad key")
+        return httpx.Response(200, json={"choices": [{"message": {"content":
+            'вот: {"suitable": true, "reason": "ok", "text": "<b>Т</b>\\n\\nтекст"}'}}]})
+    st = Storage(":memory:")
+    llm = FreeLLM(st, ["groq", "gemini"], client=httpx.Client(transport=httpx.MockTransport(handler)))
+    d, who = llm.complete("sys", "user", Draft)
+    assert d.text.startswith("<b>Т</b>") and who.startswith("gemini") and seen == ["g1", "g2", "m1"]
+    seen.clear()
+    llm.complete("sys", "user", Draft)
+    assert seen == ["m1"]  # ключи в лимите пропускаются
+
+
+def test_template_when_no_llm(monkeypatch):
+    from engine.rewriter import Rewriter
+    for k in ("GROQ_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "CLOUDFLARE_API_TOKEN"):
+        monkeypatch.delenv(k, raising=False)
+    rw = Rewriter(Settings(), Storage(":memory:"))
+    ua = make_channel(style={"language": "uk"})
+    d = rw.rewrite(ua, {"title": "Україна отримала нові ракети", "summary": "Це важлива новина для всіх. " * 40,
+                        "source": "s"})
+    assert d.suitable and d.text.startswith("<b>Україна") and len(d.text) < 800
+    d = rw.rewrite(ua, {"title": "Ukraine gets new missiles", "summary": "x", "source": "s"})
+    assert not d.suitable

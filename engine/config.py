@@ -138,6 +138,10 @@ class Settings(BaseModel):
     image_providers: list[str] = ["cloudflare", "pollinations", "gemini"]  # по очереди, пока один не сработает
     max_ai_images_per_day: int = 15
     channels_dir: str = "channels"
+    # Бесплатные провайдеры по очереди; "template" = пост без ИИ, если все ключи в лимите.
+    # "anthropic" (платный) добавляется в список только по желанию.
+    llm_providers: list[str] = ["groq", "gemini", "cloudflare", "openrouter", "template"]
+    llm_models: dict[str, list[str]] = {}  # переопределить модели провайдера, например {"groq": ["llama-3.3-70b-versatile"]}
     llm_model: str = "claude-opus-5-5"
     llm_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
     max_llm_calls_per_day: int = 300

@@ -5,10 +5,10 @@ import html
 import logging
 import re
 
-import anthropic
 from pydantic import BaseModel, Field
 
 from .config import ChannelCfg, Settings
+from .llm import FreeLLM
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +29,33 @@ class Promo(BaseModel):
 
 class BudgetExceeded(Exception):
     pass
+
+
+class NoLLM(Exception):
+    """Ни один бесплатный ключ сейчас не отвечает."""
+
+
+def template_draft(ch: ChannelCfg, item: dict, full_text: str = "") -> Draft | None:
+    """Пост без ИИ: заголовок и начало анонса источника. Только если язык источника совпадает с каналом."""
+    from .sources import strip_html
+    title = strip_html(item.get("title") or "")
+    body = strip_html(item.get("summary") or "") or strip_html(full_text)[:600]
+    lang = ch.style.language
+    cyr = len(re.findall(r"[а-яёіїєґ]", title.lower())) / max(1, len(re.findall(r"\w", title)))
+    if lang in ("uk", "ru") and cyr < 0.5:
+        return Draft(suitable=False, reason="template: другой язык источника", text="")
+    if lang == "uk" and not re.search(r"[іїєґ]", (title + body).lower()):
+        return Draft(suitable=False, reason="template: не українська", text="")
+    if lang == "ru" and re.search(r"[іїєґ]", (title + body).lower()):
+        return Draft(suitable=False, reason="template: не русский", text="")
+    if body.lower().startswith(title.lower()[:40]):
+        body = body[len(title):].strip(" .:-—")
+    limit = min(ch.style.max_chars, 700)
+    if len(body) > limit:
+        cut = body[:limit]
+        body = cut[:max(cut.rfind(". "), cut.rfind("! "), cut.rfind("? ")) + 1] or cut.rsplit(" ", 1)[0] + "…"
+    text = f"<b>{html.escape(title)}</b>" + (f"\n\n{html.escape(body)}" if body else "")
+    return Draft(suitable=True, reason="template", text=text, media_ok=True)
 
 
 def system_prompt(ch: ChannelCfg, fmt: str = "") -> str:
@@ -144,13 +171,23 @@ class Rewriter:
     def __init__(self, settings: Settings, storage):
         self.s = settings
         self.storage = storage
-        self.client = anthropic.Anthropic()
+        self.free = FreeLLM(storage, settings.llm_providers, settings.llm_models)
+        self.claude = None
+        if "anthropic" in settings.llm_providers:
+            import anthropic
+            self.claude = anthropic.Anthropic()
 
     def _call(self, system: str, user: str, schema):
         if self.storage.llm_calls_last_day() >= self.s.max_llm_calls_per_day:
             raise BudgetExceeded("daily LLM budget reached")
         self.storage.log_llm_call()
-        resp = self.client.beta.messages.parse(
+        res, who = self.free.complete(system, user, schema)
+        if who:
+            log.info("LLM answered by %s", who)
+            return res
+        if self.claude is None:
+            raise NoLLM("all free LLM keys are at their limits")
+        resp = self.claude.beta.messages.parse(
             model=self.s.llm_model,
             max_tokens=4000,
             system=system,
@@ -175,13 +212,22 @@ class Rewriter:
                 + (f"Текст статьи: {full_text}\n" if full_text else "")
                 + ("Приложено: видео\n" if str(item.get("image") or "").startswith("video:")
                    else "Приложено: фото\n" if item.get("image") else "") + "</source>")
-        draft = self._call(system_prompt(ch, fmt), user, Draft)
+        try:
+            draft = self._call(system_prompt(ch, fmt), user, Draft)
+        except NoLLM as e:
+            if "template" not in self.s.llm_providers:
+                raise
+            log.info("[%s] %s, using template", ch.id, e)
+            return template_draft(ch, item, full_text)
         if not ch.style.editor or not draft or not draft.suitable:
             return draft
-        alt = self._call(system_prompt(ch, alt_fmt), user, Draft) if alt_fmt else None
-        variants = [d for d in (draft, alt) if d and d.suitable and d.text.strip()]
-        edited = self._call(editor_prompt(ch), user + "\n\n" + "\n\n".join(
-            f"<variant n=\"{i + 1}\">\n{d.text}\n</variant>" for i, d in enumerate(variants)), Draft)
+        try:
+            alt = self._call(system_prompt(ch, alt_fmt), user, Draft) if alt_fmt else None
+            variants = [d for d in (draft, alt) if d and d.suitable and d.text.strip()]
+            edited = self._call(editor_prompt(ch), user + "\n\n" + "\n\n".join(
+                f"<variant n=\"{i + 1}\">\n{d.text}\n</variant>" for i, d in enumerate(variants)), Draft)
+        except (NoLLM, BudgetExceeded):
+            return draft
         if not edited or not edited.suitable or not edited.text.strip():
             return draft  # редактор не справился: берём вариант автора
         edited.image_prompt = edited.image_prompt or draft.image_prompt
