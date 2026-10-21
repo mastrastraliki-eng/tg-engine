@@ -492,9 +492,35 @@ class Engine:
                 except Exception as e:
                     log.warning("[%s] promo post %d not edited: %s", ch.id, p["id"], e)
 
+    def sync_profiles(self):
+        """Название, описание и аватар канала из конфига; каждое меняется только когда отличается от прошлого."""
+        for ch in self.channels.values():
+            pr = ch.profile
+            if not ch.enabled or not ch.bot_token or not ch.chat_id or self.s.dry_run:
+                continue
+            bot = self.bot(ch.bot_token)
+            photo_sig = ""
+            if pr.photo and os.path.exists(pr.photo):
+                photo_sig = f"{pr.photo}:{os.path.getsize(pr.photo)}"
+            for key, value, call in (
+                ("title", pr.title, lambda v: bot.call("setChatTitle", chat_id=ch.chat_id, title=v)),
+                ("description", pr.description,
+                 lambda v: bot.call("setChatDescription", chat_id=ch.chat_id, description=v)),
+                ("photo", photo_sig, lambda v: bot.set_chat_photo(ch.chat_id, pr.photo)),
+            ):
+                if not value or self.st.get_state(ch.id, f"profile_{key}") == value:
+                    continue
+                try:
+                    call(value)
+                    self.st.set_state(ch.id, f"profile_{key}", value)
+                    log.info("[%s] channel %s updated", ch.id, key)
+                except Exception as e:
+                    log.warning("[%s] channel %s not updated: %s", ch.id, key, e)
+
     def run_forever(self):
         health.install()
         self.fix_promo_links()
+        self.sync_profiles()
         if self.s.seed_once and self.st.get_state("_seed", "done") != self.s.seed_once:
             for ch in self.channels.values():
                 if ch.enabled and (not self.s.seed_channels or ch.id in self.s.seed_channels):

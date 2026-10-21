@@ -1,0 +1,57 @@
+id: ai_tools
+title: "🧠 ШІ на щодень | Нейромережі"
+username: "vartovyi_neba_ua"          # бывший канал тревог; сменить @ можно только в Telegram вручную
+niche: >
+  Практичні ШІ-інструменти й нейромережі: нові можливості ChatGPT, Claude, Gemini та інших сервісів,
+  корисні програми, промпти й лайфхаки, як застосувати ШІ в роботі, навчанні й побуті.
+  Для українців, які хочуть економити час, а не читати хайп.
+bot_token_env: ALERTS_BOT_TOKEN       # тот же бот и тот же канал, что были у тревог
+chat_id_env: ALERTS_CHAT_ID
+enabled: false                        # включится после «да» от владельца
+mode: auto
+queue_target: 2
+profile:                              # бот сам выставит название, описание и аватар канала
+  title: "🧠 ШІ на щодень | Нейромережі"
+  description: "Нейромережі, які реально економлять час. Нові ШІ-інструменти, промпти й лайфхаки українською — щодня, коротко і без води."
+  photo: assets/ai_tools_avatar.png
+sources:
+  - {type: rss, url: "https://techcrunch.com/category/artificial-intelligence/feed/", name: TechCrunch, weight: 1.1}
+  - {type: rss, url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", name: The Verge, weight: 1.1}
+  - {type: rss, url: "https://venturebeat.com/category/ai/feed/", name: VentureBeat}
+  - {type: rss, url: "https://the-decoder.com/feed/", name: The Decoder, weight: 1.1}
+  - {type: rss, url: "https://www.marktechpost.com/feed/", name: MarkTechPost, weight: 0.8}
+  - {type: rss, url: "https://dou.ua/feed/", name: DOU, weight: 1.2, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
+  - {type: rss, url: "https://ain.ua/feed/", name: AIN, weight: 1.2, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
+  - {type: rss, url: "https://mezha.media/feed/", name: Mezha, weight: 1.1, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
+schedule:
+  posts_per_day: 5
+  active_hours: [9, 22]
+  min_gap_minutes: 90
+style:
+  images: source_or_card
+  card_color: "#8b5cf6"
+  ai_images: "off"
+  language: uk
+  voice: "Просто й по-людськи, як друг, який розбирається в ШІ: що це, навіщо мені і як спробувати. Без хайпу, без канцеляриту, з легким гумором."
+  design: "Заголовок з одним тематичним емодзі в <b>жирному</b>. 3–5 коротких рядків, кожен зі своїм емодзі. Назви сервісів і головні цифри <b>жирним</b>. В кінці рядок «👉 Як спробувати:» з одним реченням, де і як це відкрити (тільки якщо це є в матеріалі)."
+  formats:
+    - "Що нового: заголовок, суть одним реченням, 2–3 рядки що саме вміє, і «👉 Як спробувати»."
+    - "Лайфхак: заголовок «як зробити X за допомогою Y», 3 кроки списком 1️⃣ 2️⃣ 3️⃣, і для кого це корисно."
+    - "Порівняння було → стало: як це робилося раніше і що змінилось з новим інструментом, 3 рядки, і висновок."
+    - "Коротка блискавка: ⚡️ заголовок, 2 речення суті, головна цифра жирним."
+  rules:
+    - "Відхиляй хайп без практичної користі, прогнози «ШІ замінить усіх», пресрелізи, рекламні та платні матеріали."
+    - "Пиши тільки про те, що можна спробувати або що реально змінює роботу з ШІ. Корпоративні угоди й фінансування — тільки якщо це важливо для користувачів."
+    - "Технічні терміни пояснюй одним простим реченням."
+    - "Не вигадуй ціни, тарифи й посилання: тільки те, що є в матеріалі."
+  max_chars: 700
+  hashtags: 1
+  include_source_link: true
+  signature: ""
+filters:
+  exclude_keywords: ["sponsored", "partner content", "реклама", "партнерський", "webinar", "вебінар"]
+  max_age_hours: 36
+promo:
+  enabled: true
+  every_days: 5
+  partners: [crypto_news]

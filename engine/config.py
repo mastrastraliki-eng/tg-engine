@@ -98,6 +98,13 @@ class MarketSummaryCfg(BaseModel):
     skip_review: bool = True            # данные устаревают, публикуем сразу
 
 
+class ProfileCfg(BaseModel):
+    """Оформление канала: бот выставляет его сам, когда значения меняются."""
+    title: str = ""
+    description: str = ""
+    photo: str = ""                     # путь к картинке относительно папки проекта
+
+
 class ChannelCfg(BaseModel):
     id: str
     title: str
@@ -116,6 +123,7 @@ class ChannelCfg(BaseModel):
     promo: PromoCfg = PromoCfg()
     relay: RelayCfg = RelayCfg()
     market_summary: MarketSummaryCfg = MarketSummaryCfg()
+    profile: ProfileCfg = ProfileCfg()
     queue_target: int = 3               # сколько готовых постов держать в очереди
 
     @property

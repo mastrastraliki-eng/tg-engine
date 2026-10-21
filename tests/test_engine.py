@@ -166,8 +166,8 @@ def test_daily_cap(monkeypatch):
 def test_example_configs_load():
     chs = load_channels("channels")
     assert {"crypto_news", "ua_news", "alerts"} <= set(chs)
-    tokens = [c.bot_token_env for c in chs.values()]
-    assert len(tokens) == len(set(tokens)), "у каждого канала свой бот"
+    tokens = [c.bot_token_env for c in chs.values() if c.enabled]
+    assert len(tokens) == len(set(tokens)), "у каждого работающего канала свой бот"
 
 
 TG_PAGE = """
@@ -469,3 +469,24 @@ def test_old_promo_link_fixed_once(monkeypatch):
     eng.fix_promo_links()
     eng.fix_promo_links()
     assert len(edits) == 1 and edits[0][1] == 29 and 'href="https://t.me/trymai_kurs_ua"' in edits[0][2]
+
+
+def test_profile_synced_once(monkeypatch, tmp_path):
+    monkeypatch.setenv("T1", "tok1")
+    monkeypatch.setenv("C1", "@chan")
+    photo = tmp_path / "a.png"
+    photo.write_bytes(b"x")
+    calls = []
+
+    class PBot(FakeBot):
+        def call(self, method, **p):
+            calls.append(method)
+
+        def set_chat_photo(self, chat_id, path):
+            calls.append("setChatPhoto")
+    ch = make_channel(profile={"title": "Нове", "description": "Опис", "photo": str(photo)})
+    eng, st = setup_engine(ch)
+    eng.bot_factory = PBot
+    eng.sync_profiles()
+    eng.sync_profiles()
+    assert calls == ["setChatTitle", "setChatDescription", "setChatPhoto"]

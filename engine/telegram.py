@@ -42,6 +42,14 @@ class Bot:
                 continue
             raise TelegramError(data.get("error_code", r.status_code), data.get("description", ""))
 
+    def set_chat_photo(self, chat_id, path: str):
+        with open(path, "rb") as f:
+            r = self.http.post(self.base + "setChatPhoto", data={"chat_id": chat_id}, files={"photo": f})
+        data = r.json()
+        if not data.get("ok"):
+            raise TelegramError(data.get("error_code", r.status_code), data.get("description", ""))
+        return data["result"]
+
     def get_me(self):
         return self.call("getMe")
 
