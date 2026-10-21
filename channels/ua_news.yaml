@@ -7,7 +7,7 @@ niche: >
   новини без паніки та без пропаганди.
 bot_token_env: NEWS_BOT_TOKEN
 chat_id_env: NEWS_CHAT_ID
-mode: review                          # війна і політика завжди через ✅/❌
+mode: auto                            # публикует сам, без ✅/❌
 review_chat_id_env: REVIEW_CHAT_ID
 queue_target: 4
 sources:

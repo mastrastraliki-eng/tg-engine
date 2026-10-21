@@ -107,6 +107,9 @@ class Engine:
     def prepare(self, ch: ChannelCfg) -> int:
         """Дописывает очередь до queue_target готовыми постами."""
         self.st.expire_queue(ch.id, QUEUE_MAX_AGE_HOURS)
+        if ch.mode == "auto":  # канал сняли с модерации: ждущие кнопок посты идут в очередь
+            self.st.db.execute("UPDATE posts SET status='queued' WHERE channel=? AND status='pending_review'", (ch.id,))
+            self.st.db.commit()
         ready = self.st.count_posts(ch.id, "queued") + self.st.count_posts(ch.id, "pending_review")
         target = max(ch.queue_target, int(self.st.get_state(ch.id, "seed_left", "0")))
         made = 0
