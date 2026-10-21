@@ -390,3 +390,10 @@ def test_no_preparing_at_night(monkeypatch):
     assert called == []
     eng.tick(datetime(2026, 10, 21, 6, 30, tzinfo=tz).timestamp())   # за час до начала уже готовим
     assert called == ["c", "p"]
+
+
+def test_repeat_headline_detected():
+    from engine.core import is_repeat
+    recent = ["15 років за спробу підірвати залізницю"]
+    assert is_repeat("Суд дав 15 років чоловіку, який намагався підірвати залізницю", recent)
+    assert not is_repeat("Україна отримала від США нові ракети", ["Росія атакувала Україну дронами вночі"])

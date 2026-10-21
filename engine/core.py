@@ -23,6 +23,22 @@ QUEUE_MAX_AGE_HOURS = 12
 SEED_GAP_MINUTES = 12
 
 
+def _stems(text: str) -> set[str]:
+    return {w[:5] for w in sources.normalize_title(text).split() if len(w) > 3}
+
+
+def is_repeat(headline: str, recent: list[str], threshold: float = 0.6) -> bool:
+    """Тот же сюжет, что у недавнего поста: совпадает большинство основ слов заголовка."""
+    a = _stems(headline)
+    if len(a) < 3:
+        return False
+    for r in recent:
+        b = _stems(r)
+        if len(b) >= 3 and len(a & b) / min(len(a), len(b)) >= threshold:
+            return True
+    return False
+
+
 class Engine:
     def __init__(self, settings: Settings, channels: dict[str, ChannelCfg], storage, rewriter,
                  bot_factory=Bot, rng: random.Random | None = None):
@@ -116,6 +132,7 @@ class Engine:
         target = max(ch.queue_target, int(self.st.get_state(ch.id, "seed_left", "0")))
         made = 0
         attempts = 0
+        recent = self.st.recent_headlines(ch.id)
         for item in self.st.candidates(ch.id, limit=target * 4):
             if ready >= target or attempts >= target * 3:
                 break
@@ -126,7 +143,7 @@ class Engine:
                 with httpx.Client(headers={"User-Agent": sources.UA}, timeout=20, follow_redirects=True) as c:
                     full = sources.fetch_full_text(c, item["url"])
             try:
-                draft = self.rw.rewrite(ch, item, full, recent=self.st.recent_headlines(ch.id),
+                draft = self.rw.rewrite(ch, item, full, recent=recent,
                                         fmt=self.next_format(ch),
                                         alt_fmt=self.next_format(ch) if ch.style.editor else "")
             except BudgetExceeded:
@@ -138,13 +155,18 @@ class Engine:
             if not draft or not draft.suitable or not draft.text.strip():
                 self.st.set_item_status(item["id"], "rejected", draft.reason if draft else "refusal")
                 continue
+            first = re.sub(r"<[^>]+>", "", draft.text.strip().split("\n", 1)[0]) or item["title"]
+            if is_repeat(first, recent):
+                self.st.set_item_status(item["id"], "duplicate", "same story as a recent post")
+                log.info("[%s] skip repeat: %s", ch.id, first[:80])
+                continue
+            recent.append(first)
             text = finalize(ch, draft.text, item.get("url"))
             status = "pending_review" if ch.mode == "review" else "queued"
             src_img = item.get("image")
             if not src_img and item.get("use_images") and item.get("url") and ch.style.images in ("source", "source_or_card"):
                 with httpx.Client(headers={"User-Agent": sources.UA}, timeout=15, follow_redirects=True) as c:
                     src_img = sources.fetch_og_image(c, item["url"])
-            first = re.sub(r"<[^>]+>", "", draft.text.strip().split("\n", 1)[0]) or item["title"]
             if not draft.media_ok:
                 src_img = None
             image, fallback = self.images_for(ch, first, src_img)
