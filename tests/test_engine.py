@@ -436,3 +436,11 @@ def test_template_when_no_llm(monkeypatch):
     assert d.suitable and d.text.startswith("<b>Україна") and len(d.text) < 800
     d = rw.rewrite(ua, {"title": "Ukraine gets new missiles", "summary": "x", "source": "s"})
     assert not d.suitable
+
+
+def test_night_posts_do_not_use_daily_limit():
+    from engine.schedule import day_start_ts
+    s = ScheduleCfg(active_hours=[7, 22], timezone="Europe/Kyiv")
+    now = datetime(2026, 10, 21, 18, 0, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
+    night = datetime(2026, 10, 21, 3, 30, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
+    assert night < day_start_ts(now, s) < now

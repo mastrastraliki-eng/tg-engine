@@ -31,6 +31,7 @@ def next_slot(now_ts: float, s: ScheduleCfg, rng: random.Random | None = None) -
 
 
 def day_start_ts(now_ts: float, s: ScheduleCfg) -> float:
+    """Начало сегодняшнего окна публикаций: ночные (стартовые) посты не съедают дневной лимит."""
     tz = ZoneInfo(s.timezone)
-    d = datetime.fromtimestamp(now_ts, tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    d = datetime.fromtimestamp(now_ts, tz).replace(hour=s.active_hours[0], minute=0, second=0, microsecond=0)
     return d.timestamp()
