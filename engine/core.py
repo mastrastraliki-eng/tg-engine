@@ -7,17 +7,20 @@ import os
 import random
 import re
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 
 from . import cards, health, market, sources
 from .config import ChannelCfg, Settings
 from .rewriter import BudgetExceeded, finalize
-from .schedule import day_start_ts, next_slot
+from .schedule import day_start_ts, in_active_hours, next_slot
 from .telegram import Bot, TelegramError
 
 log = logging.getLogger(__name__)
 QUEUE_MAX_AGE_HOURS = 12
+SEED_GAP_MINUTES = 12
 
 
 class Engine:
@@ -107,10 +110,11 @@ class Engine:
         """Дописывает очередь до queue_target готовыми постами."""
         self.st.expire_queue(ch.id, QUEUE_MAX_AGE_HOURS)
         ready = self.st.count_posts(ch.id, "queued") + self.st.count_posts(ch.id, "pending_review")
+        target = max(ch.queue_target, int(self.st.get_state(ch.id, "seed_left", "0")))
         made = 0
         attempts = 0
-        for item in self.st.candidates(ch.id, limit=ch.queue_target * 4):
-            if ready >= ch.queue_target or attempts >= ch.queue_target * 3:
+        for item in self.st.candidates(ch.id, limit=target * 4):
+            if ready >= target or attempts >= target * 3:
                 break
             attempts += 1
             item = dict(item)
@@ -208,10 +212,48 @@ class Engine:
         # промо не чаще раза в every_days и не раньше, чем выйдет хотя бы 5 обычных постов
         return now - last >= p.every_days * 86400 and self.st.published_since(ch.id, last, "news") >= 5
 
+    # --- стартовое наполнение: несколько постов подряд, чтобы новый подписчик видел живую ленту ---
+    def seed(self, ch: ChannelCfg, n: int, now: float | None = None):
+        now = now or time.time()
+        start = now if in_active_hours(datetime.fromtimestamp(now, ZoneInfo(ch.schedule.timezone)), ch.schedule) \
+            else next_slot(now, ch.schedule, self.rng)
+        self.st.set_state(ch.id, "seed_left", str(n))
+        self.st.set_state(ch.id, "seed_next", str(start))
+        if ch.kind == "relay":
+            # тревоги задним числом не нужны: только свежие сводки из фильтрованных источников (Генштаб)
+            names = [src.name for src in ch.sources if src.include_regex]
+            if not names:
+                return
+            marks = ",".join("?" * len(names))
+            rows = self.st.db.execute(
+                f"SELECT id FROM items WHERE channel=? AND source IN ({marks}) AND status='rejected' "
+                "AND reason='before start' AND COALESCE(published_ts, fetched_ts)>? "
+                "ORDER BY COALESCE(published_ts, fetched_ts) DESC LIMIT ?",
+                (ch.id, *names, now - 86400, n)).fetchall()
+            self.st.set_state(ch.id, "seed_items", ",".join(str(r["id"]) for r in reversed(rows)))
+
+    def seed_step(self, ch: ChannelCfg, now: float) -> bool:
+        """True, если сейчас время очередного стартового поста."""
+        left = int(self.st.get_state(ch.id, "seed_left", "0"))
+        return left > 0 and now >= float(self.st.get_state(ch.id, "seed_next", "0"))
+
+    def seed_done(self, ch: ChannelCfg, now: float):
+        left = int(self.st.get_state(ch.id, "seed_left", "0")) - 1
+        self.st.set_state(ch.id, "seed_left", str(max(left, 0)))
+        self.st.set_state(ch.id, "seed_next", str(now + SEED_GAP_MINUTES * 60))
+
     def publish_due(self, ch: ChannelCfg, now: float | None = None) -> int | None:
         now = now or time.time()
         if self.paused(ch):
             return None
+        if self.seed_step(ch, now):
+            post = self.st.next_queued(ch.id)
+            if not post:
+                return None
+            msg_id = self.send(ch, post)
+            if msg_id is not None:
+                self.seed_done(ch, now)
+            return msg_id
         next_at = self.st.get_state(ch.id, "next_at")
         if next_at is None:
             self.st.set_state(ch.id, "next_at", str(next_slot(now, ch.schedule, self.rng)))
@@ -292,6 +334,15 @@ class Engine:
                            "AND status='queued' AND created_ts<?", (ch.id, time.time() - 600))
         self.st.db.commit()
         sent = 0
+        now = time.time()
+        if self.seed_step(ch, now):
+            ids = [x for x in (self.st.get_state(ch.id, "seed_items") or "").split(",") if x]
+            if ids:
+                self.st.set_item_status(int(ids[0]), "new")
+                self.st.set_state(ch.id, "seed_items", ",".join(ids[1:]))
+                self.seed_done(ch, now)
+            else:
+                self.st.set_state(ch.id, "seed_left", "0")
         for it in self.st.new_in_order(ch.id, limit=ch.relay.max_per_poll):
             self.st.set_item_status(it["id"], "used")
             status = "pending_review" if ch.mode == "review" else "queued"
@@ -397,6 +448,12 @@ class Engine:
 
     def run_forever(self):
         health.install()
+        if self.s.seed_once and self.st.get_state("_seed", "done") != self.s.seed_once:
+            for ch in self.channels.values():
+                if ch.enabled:
+                    self.seed(ch, self.s.seed_posts)
+            self.st.set_state("_seed", "done", self.s.seed_once)
+            log.info("seed %s: %d posts per channel", self.s.seed_once, self.s.seed_posts)
         log.info("engine started: %d channels, dry_run=%s", len(self.channels), self.s.dry_run)
         polls = [c.relay.poll_seconds for c in self.channels.values() if c.enabled and c.kind == "relay"]
         sleep = min([self.s.tick_seconds, *polls])

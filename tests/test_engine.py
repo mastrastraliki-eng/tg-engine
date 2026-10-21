@@ -344,3 +344,45 @@ def test_health_report_once_a_day(monkeypatch):
     st.set_post_status(st.next_queued(ch.id)["id"], "published")
     text = health.build_report(eng)
     assert text.startswith("✅") and "(+0)" in text
+
+
+def test_seed_publishes_burst_then_normal(monkeypatch):
+    monkeypatch.setenv("T1", "tok1")
+    monkeypatch.setenv("C1", "@chan")
+    FakeBot.sent.clear()
+    ch = make_channel(schedule={"posts_per_day": 1})
+    eng, st = setup_engine(ch)
+    noon = datetime(2026, 10, 21, 12, 0, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
+    for i in range(4):
+        st.add_post(ch.id, f"p{i}", "queued")
+    eng.seed(ch, 3, noon)
+    assert eng.publish_due(ch, noon) is not None
+    assert eng.publish_due(ch, noon + 60) is None                  # пауза между стартовыми постами
+    assert eng.publish_due(ch, noon + 13 * 60) is not None          # дневной лимит не мешает
+    assert eng.publish_due(ch, noon + 26 * 60) is not None
+    assert st.get_state(ch.id, "seed_left") == "0"
+    assert len(FakeBot.sent) == 3
+
+
+def test_seed_at_night_waits_for_morning():
+    ch = make_channel()
+    eng, st = setup_engine(ch)
+    night = datetime(2026, 10, 21, 3, 0, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
+    eng.seed(ch, 5, night)
+    start = datetime.fromtimestamp(float(st.get_state(ch.id, "seed_next")), ZoneInfo("Europe/Kyiv"))
+    assert start.hour >= 8 and start.day == 21
+
+
+def test_relay_seed_replays_only_fresh_summaries(monkeypatch):
+    ch = make_channel(kind="relay", sources=[SourceCfg(type="telegram", channel="a"),
+                                             SourceCfg(type="telegram", channel="gs", include_regex="втрати")])
+    st = Storage(":memory:")
+    eng = Engine(Settings(dry_run=True), {ch.id: ch}, st, FakeRewriter(), bot_factory=FakeBot)
+    for i, src in enumerate(["@a", "@gs", "@gs"]):
+        st.add_item(ch.id, {"key": f"k{i}", "title": f"t{i} втрати", "title_norm": f"t{i}", "url": f"https://t.me/x/{i}",
+                            "source": src, "published_ts": time.time() - 3600})
+    st.db.execute("UPDATE items SET status='rejected', reason='before start'")
+    st.set_state(ch.id, "primed", "1")
+    monkeypatch.setattr(sources, "collect", lambda c, s: 0)
+    eng.seed(ch, 5)
+    assert len(st.get_state(ch.id, "seed_items").split(",")) == 2   # тревоги из @a не повторяем

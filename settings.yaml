@@ -6,3 +6,5 @@ max_llm_calls_per_day: 300      # предохранитель от счёта �
 tick_seconds: 60
 collect_every_minutes: 30
 dry_run: false
+seed_once: "launch-2026-10-21"   # разовое стартовое наполнение: 5 постов на канал, раз в 12 минут
+seed_posts: 5

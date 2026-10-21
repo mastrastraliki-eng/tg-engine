@@ -146,6 +146,8 @@ class Settings(BaseModel):
     dry_run: bool = False               # ничего не отправлять в Telegram
     alert_chat_id_env: str | None = "ALERT_CHAT_ID"
     alert_bot_token_env: str | None = "ALERT_BOT_TOKEN"
+    seed_once: str = ""                 # новая метка = разовое стартовое наполнение каналов при запуске
+    seed_posts: int = 5
 
 
 def load_settings(path: str | Path = "settings.yaml") -> Settings:
