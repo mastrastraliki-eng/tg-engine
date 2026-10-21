@@ -56,7 +56,7 @@ if ($code -ne 0) {
     $null = Invoke-Logged 'Update on server (ssh)' { ssh -t -i $Key -o ConnectTimeout=20 $HostName 'sudo bash /tmp/tg-update.sh' }
     # keys are on the server now: rename the local copy so it is not sent again
     $Keys = Join-Path $Src 'tg-engine\keys-new.env'
-    if (Test-Path $Keys) { Move-Item $Keys "$Keys.sent" -Force }
+    if ((Test-Path $Keys) -and (Select-String -Path $Keys -Pattern '^[A-Z_]+=\S' -Quiet)) { Move-Item $Keys "$Keys.sent" -Force }
 }
 
 Remove-Item $Tgz, $Remote -Force -ErrorAction SilentlyContinue
