@@ -11,8 +11,6 @@ relay:
   attribution: true
   max_per_poll: 15
 sources:
-  # Официальный канал приложения «Повітряна тривога»
-  - {type: telegram, channel: air_alert_ua, name: Повітряна тривога}
   # Повітряні сили ЗСУ: предупреждения об угрозах
   - {type: telegram, channel: kpszsu, name: Повітряні сили ЗСУ}
   # Генштаб: только ежедневные потери врага и оперативная информация
