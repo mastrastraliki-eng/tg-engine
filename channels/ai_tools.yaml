@@ -7,7 +7,6 @@ niche: >
   Для українців, які хочуть економити час, а не читати хайп.
 bot_token_env: ALERTS_BOT_TOKEN       # тот же бот и тот же канал, что были у тревог
 chat_id_env: ALERTS_CHAT_ID
-enabled: false                        # включится после «да» от владельца
 mode: auto
 queue_target: 2
 profile:                              # бот сам выставит название, описание и аватар канала
