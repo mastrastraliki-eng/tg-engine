@@ -445,7 +445,8 @@ class Engine:
             last = float(self.st.get_state(ch.id, "last_collect", "0"))
             # ночью не готовим посты: к утру они устареют, а вызовы Claude уже потрачены
             soon = datetime.fromtimestamp(now + 3600, ZoneInfo(ch.schedule.timezone))
-            if now - last >= self.s.collect_every_minutes * 60 and in_active_hours(soon, ch.schedule):
+            seeding = int(self.st.get_state(ch.id, "seed_left", "0")) > 0  # разовый выпуск ждёт готовый пост
+            if now - last >= self.s.collect_every_minutes * 60 and (seeding or in_active_hours(soon, ch.schedule)):
                 try:
                     self.collect(ch)
                     self.prepare(ch)

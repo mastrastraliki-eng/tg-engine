@@ -393,6 +393,18 @@ def test_no_preparing_at_night(monkeypatch):
     assert called == ["c", "p"]
 
 
+def test_seed_prepares_at_night(monkeypatch):
+    ch = make_channel(schedule={"active_hours": [9, 22]})
+    eng, st = setup_engine(ch)
+    called = []
+    monkeypatch.setattr(eng, "collect", lambda c: called.append("c"))
+    monkeypatch.setattr(eng, "prepare", lambda c: called.append("p"))
+    now = datetime(2026, 10, 21, 22, 6, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
+    eng.seed(ch, 1, now)
+    eng.tick(now)
+    assert called == ["c", "p"]
+
+
 def test_repeat_headline_detected():
     from engine.core import is_repeat
     recent = ["15 років за спробу підірвати залізницю"]
