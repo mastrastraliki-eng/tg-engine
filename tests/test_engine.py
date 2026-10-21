@@ -444,3 +444,28 @@ def test_night_posts_do_not_use_daily_limit():
     now = datetime(2026, 10, 21, 18, 0, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
     night = datetime(2026, 10, 21, 3, 30, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
     assert night < day_start_ts(now, s) < now
+
+
+def test_promo_link_is_clickable():
+    from engine.rewriter import channel_link, sanitize_html
+    link = channel_link("trymai_kurs_ua")
+    assert link == '<a href="https://t.me/trymai_kurs_ua">@trymai_kurs_ua</a>'
+    assert channel_link("@trymai_kurs_ua") == link and sanitize_html(link) == link
+
+
+def test_old_promo_link_fixed_once(monkeypatch):
+    monkeypatch.setenv("T1", "tok1")
+    monkeypatch.setenv("C1", "@chan")
+    edits = []
+
+    class EditBot(FakeBot):
+        def call(self, method, **p):
+            edits.append((method, p["message_id"], p["text"]))
+    ch = make_channel()
+    eng, st = setup_engine(ch)
+    eng.bot_factory = EditBot
+    pid = st.add_post(ch.id, "Текст\n\n👉 trymai_kurs_ua", "queued", kind="promo")
+    st.set_post_status(pid, "published", message_id=29)
+    eng.fix_promo_links()
+    eng.fix_promo_links()
+    assert len(edits) == 1 and edits[0][1] == 29 and 'href="https://t.me/trymai_kurs_ua"' in edits[0][2]

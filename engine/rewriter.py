@@ -151,6 +151,12 @@ def sanitize_html(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "".join(out)).strip()
 
 
+def channel_link(username: str) -> str:
+    """Кликабельная ссылка на канал: @name, ведущая на t.me/name."""
+    u = html.escape(username.strip().lstrip("@").replace("https://t.me/", ""))
+    return f'<a href="https://t.me/{u}">@{u}</a>'
+
+
 def finalize(ch: ChannelCfg, body: str, url: str | None) -> str:
     parts = [sanitize_html(body)]
     tail = []
@@ -243,7 +249,7 @@ class Rewriter:
         res = self._call(system, user, Promo)
         if not res:
             return None
-        return f"{sanitize_html(res.text)}\n\n👉 {html.escape(partner.username)}"
+        return f"{sanitize_html(res.text)}\n\n👉 {channel_link(partner.username)}"
 
 
 class FakeRewriter:
@@ -254,4 +260,4 @@ class FakeRewriter:
                      text=f"<b>{item['title']}</b>\n\n{(item.get('summary') or '')[:300]}")
 
     def promo(self, ch, partner):
-        return f"<b>{partner.title}</b>: {partner.niche}\n\n👉 {partner.username}"
+        return f"<b>{partner.title}</b>: {partner.niche}\n\n👉 {channel_link(partner.username)}"

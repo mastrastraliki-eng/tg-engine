@@ -14,7 +14,7 @@ import httpx
 
 from . import cards, health, market, sources
 from .config import ChannelCfg, Settings
-from .rewriter import BudgetExceeded, finalize
+from .rewriter import BudgetExceeded, channel_link, finalize
 from .schedule import day_start_ts, in_active_hours, next_slot
 from .telegram import Bot, TelegramError
 
@@ -471,8 +471,30 @@ class Engine:
         except Exception as e:
             log.warning("health report crashed: %s", e)
 
+    def fix_promo_links(self):
+        """Старые посты взаимопиара с некликабельным username: дописываем ссылку (один раз)."""
+        rows = self.st.db.execute(
+            "SELECT * FROM posts WHERE kind='promo' AND status IN ('published','queued')").fetchall()
+        for p in rows:
+            ch = self.channels.get(p["channel"])
+            m = re.search(r"👉 @?([A-Za-z0-9_]{4,})\s*$", p["text"])
+            if not ch or not m:
+                continue
+            text = p["text"][:m.start()] + "👉 " + channel_link(m.group(1))
+            self.st.db.execute("UPDATE posts SET text=? WHERE id=?", (text, p["id"]))
+            self.st.db.commit()
+            if p["status"] == "published" and p["message_id"] and ch.bot_token and ch.chat_id and not self.s.dry_run:
+                try:
+                    self.bot(ch.bot_token).call("editMessageText", chat_id=ch.chat_id, message_id=p["message_id"],
+                                                text=text, parse_mode="HTML",
+                                                link_preview_options={"is_disabled": True})
+                    log.info("[%s] promo post %d link fixed", ch.id, p["id"])
+                except Exception as e:
+                    log.warning("[%s] promo post %d not edited: %s", ch.id, p["id"], e)
+
     def run_forever(self):
         health.install()
+        self.fix_promo_links()
         if self.s.seed_once and self.st.get_state("_seed", "done") != self.s.seed_once:
             for ch in self.channels.values():
                 if ch.enabled and (not self.s.seed_channels or ch.id in self.s.seed_channels):
