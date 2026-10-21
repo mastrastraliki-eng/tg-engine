@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 keys-new.env
 *.sent
+server-log.txt
