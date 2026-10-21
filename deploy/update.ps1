@@ -27,7 +27,7 @@ function Invoke-Logged([string]$Title, [scriptblock]$Cmd) {
 
 Remove-Item $Tgz -Force -ErrorAction SilentlyContinue
 $null = Invoke-Logged 'Building archive' {
-    tar.exe -czf $Tgz -C $Src --exclude=.env --exclude=data --exclude=.venv --exclude=.pytest_cache --exclude=__pycache__ --exclude='backup*' tg-engine
+    tar.exe -czf $Tgz -C $Src --exclude=.env --exclude=*.sent --exclude=data --exclude=.venv --exclude=.pytest_cache --exclude=__pycache__ --exclude='backup*' tg-engine
 }
 if (-not (Test-Path $Tgz)) { Write-Log 'ERROR: archive was not created'; exit 1 }
 
@@ -38,6 +38,7 @@ $script = @(
     'mv /tmp/tg-engine /root/tg-engine-src'
     'cd /root/tg-engine-src'
     "sed -i 's/\r`$//' deploy/install.sh deploy/tg-engine.service"
+    '[ -f keys-new.env ] && [ -f /opt/tg-engine/.env ] && python3 deploy/merge_env.py keys-new.env /opt/tg-engine/.env'
     'bash deploy/install.sh; echo "install.sh exit: $?"'
     'echo; echo "==== waiting 30s"; sleep 30'
     'echo "service: $(systemctl is-active tg-engine)"'
@@ -53,6 +54,9 @@ if ($code -ne 0) {
     Write-Log 'ERROR: upload failed, nothing changed on the server'
 } else {
     $null = Invoke-Logged 'Update on server (ssh)' { ssh -t -i $Key -o ConnectTimeout=20 $HostName 'sudo bash /tmp/tg-update.sh' }
+    # keys are on the server now: rename the local copy so it is not sent again
+    $Keys = Join-Path $Src 'tg-engine\keys-new.env'
+    if (Test-Path $Keys) { Move-Item $Keys "$Keys.sent" -Force }
 }
 
 Remove-Item $Tgz, $Remote -Force -ErrorAction SilentlyContinue
