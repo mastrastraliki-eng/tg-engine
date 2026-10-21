@@ -18,7 +18,7 @@ sources:
   - {type: rss, url: "https://cointelegraph.com/rss", name: Cointelegraph}
   - {type: rss, url: "https://decrypt.co/feed", name: Decrypt, weight: 0.9}
 schedule:
-  posts_per_day: 5
+  posts_per_day: 6
   active_hours: [7, 22]             # с 7:00 до 22:00 по Киеву, ночью тишина
   min_gap_minutes: 90
 style:

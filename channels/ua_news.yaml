@@ -19,7 +19,7 @@ sources:
   - {type: telegram, channel: V_Zelenskiy_official, name: Володимир Зеленський, weight: 1.3}
   - {type: telegram, channel: GeneralStaffZSU, name: Генштаб ЗСУ, weight: 1.1}
 schedule:
-  posts_per_day: 8
+  posts_per_day: 10
   active_hours: [7, 22]             # с 7:00 до 22:00 по Киеву, ночью тишина
   min_gap_minutes: 60
 style:
