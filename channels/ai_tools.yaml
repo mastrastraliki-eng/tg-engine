@@ -23,7 +23,7 @@ sources:
   - {type: rss, url: "https://ain.ua/feed/", name: AIN, weight: 1.2, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
   - {type: rss, url: "https://mezha.media/feed/", name: Mezha, weight: 1.1, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
 schedule:
-  posts_per_day: 5
+  posts_per_day: 6
   active_hours: [9, 22]
   min_gap_minutes: 90
 style:
