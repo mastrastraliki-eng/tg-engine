@@ -55,4 +55,4 @@ filters:
 promo:
   enabled: true
   every_days: 4
-  partners: [crypto_news]
+  partners: [crypto_news, ai_tools]
