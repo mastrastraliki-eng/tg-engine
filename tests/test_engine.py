@@ -573,3 +573,22 @@ def test_evening_digest_links_posts(monkeypatch):
     assert text.count("▪️") == 3 and 'href="https://t.me/test_chan/100"' in text
     assert "Новина номер 0 про важливе" in text and "Терміново" not in text
     assert not eng.digest_due(ch, monkey_now + 60)
+
+
+def test_sanitize_flattens_nested_same_tag():
+    assert sanitize_html("<b>Microsoft <b>1 024</b> агенти</b> і <b>x</b>") == "<b>Microsoft 1 024 агенти</b> і <b>x</b>"
+
+
+def test_promo_drops_invented_links():
+    from engine.rewriter import Promo, Rewriter
+
+    class R(Rewriter):
+        def __init__(self):
+            pass
+
+        def _call(self, system, user, schema):
+            return Promo(text='Корисний канал 🤖\n\n👉 <a href="https://t.me/example">Заглянь</a>')
+
+    ch, partner = make_channel(), make_channel(id="p", username="real_chan")
+    text = R().promo(ch, partner)
+    assert "example" not in text and text.count("👉") == 1 and 'href="https://t.me/real_chan"' in text
