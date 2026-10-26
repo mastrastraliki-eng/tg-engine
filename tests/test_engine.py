@@ -502,3 +502,74 @@ def test_profile_synced_once(monkeypatch, tmp_path):
     eng.sync_profiles()
     eng.sync_profiles()
     assert calls == ["setChatTitle", "setChatDescription", "setChatPhoto"]
+
+
+def test_headline_skips_rubric_line():
+    from engine.core import headline
+    assert headline("⚡️ Терміново\n\n<b>Рада ухвалила бюджет на 2027 рік</b>\n\nтекст") == \
+        "Рада ухвалила бюджет на 2027 рік"
+    assert headline("<b>Коротко</b>") == "Коротко"
+
+
+def test_detect_coin_first_mentioned():
+    from engine.market import detect_coin
+    assert detect_coin("Киты скупают <b>эфир</b>, а биткоин стоит") == ("ethereum", "ETH")
+    assert detect_coin("SEC против Ripple: XRP растёт") == ("ripple", "XRP")
+    assert detect_coin("Регуляторы ЕС приняли закон") is None
+
+
+def _ohlc(n=48):
+    t, p, out = NOW * 1000, 100.0, []
+    for i in range(n):
+        c = p * (1.01 if i % 3 else 0.99)
+        out.append([t + i * 1800000, p, max(p, c) * 1.002, min(p, c) * 0.998, c])
+        p = c
+    return out
+
+
+def test_chart_card_renders(tmp_path):
+    from engine import cards
+    from PIL import Image
+    path = cards.chart_card("BTC", _ohlc(), "Крипто Пульс", "#f7931a", tmp_path)
+    assert Image.open(path).size == (1280, 720)
+
+
+def test_media_mix_rotates_and_prefers_video(monkeypatch):
+    from engine import market
+    monkeypatch.setattr(market, "fetch_ohlc", lambda c, cid, days=1: _ohlc())
+    ch = make_channel(style={"images": "source_or_card", "media_mix": {"source": 1, "chart": 1}})
+    eng = Engine(Settings(), {ch.id: ch}, Storage(":memory:"), FakeRewriter(), bot_factory=FakeBot,
+                 rng=random.Random(1))
+    d = Draft(suitable=True, reason="", text="<b>Биткоин обновил максимум</b>")
+    img, fb = eng.pick_media(ch, d, "t", "Биткоин обновил максимум", "video:https://cdn/x.mp4")
+    assert img == "video:https://cdn/x.mp4" and fb.endswith(".png")
+    kinds = []
+    for _ in range(12):
+        img, fb = eng.pick_media(ch, d, "t", "Биткоин обновил максимум", "https://ex.com/p.jpg")
+        kinds.append("source" if img == "https://ex.com/p.jpg" else "chart")
+        assert fb  # всегда есть запасная картинка
+    assert {"source", "chart"} == set(kinds)
+    # без монеты в тексте график невозможен: берём фото из новости
+    d2 = Draft(suitable=True, reason="", text="<b>Регуляторы ЕС приняли закон</b>")
+    assert eng.pick_media(ch, d2, "t", "x", "https://ex.com/p.jpg")[0] == "https://ex.com/p.jpg"
+
+
+def test_evening_digest_links_posts(monkeypatch):
+    ch = make_channel(username="test_chan", digest={"enabled": True, "time": "21:00", "max_items": 3})
+    st = Storage(":memory:")
+    eng = Engine(Settings(), {ch.id: ch}, st, FakeRewriter(), bot_factory=FakeBot)
+    monkey_now = datetime(2026, 10, 26, 21, 5, tzinfo=ZoneInfo("Europe/Kyiv")).timestamp()
+    for i in range(5):
+        pid = st.add_post(ch.id, f"⚡️ Терміново\n\n<b>Новина номер {i} про важливе</b>", "published")
+        st.db.execute("UPDATE posts SET message_id=?, published_ts=? WHERE id=?",
+                      (100 + i, monkey_now - 3600 * (5 - i), pid))
+    st.db.commit()
+    monkeypatch.setenv("T1", "tok")
+    monkeypatch.setenv("C1", "@c")
+    assert eng.digest_due(ch, monkey_now)
+    FakeBot.sent.clear()
+    eng.digest(ch, monkey_now)
+    text = FakeBot.sent[-1][2]
+    assert text.count("▪️") == 3 and 'href="https://t.me/test_chan/100"' in text
+    assert "Новина номер 0 про важливе" in text and "Терміново" not in text
+    assert not eng.digest_due(ch, monkey_now + 60)

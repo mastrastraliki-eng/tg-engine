@@ -95,7 +95,9 @@ class Storage:
     def candidates(self, channel: str, limit: int = 20) -> list[sqlite3.Row]:
         return self.db.execute(
             "SELECT * FROM items WHERE channel=? AND status='new' "
-            "ORDER BY weight * (1.0 / (1 + (? - COALESCE(published_ts, fetched_ts)) / 3600.0)) DESC LIMIT ?",
+            # свежее и весомее выше; с видео или фото чуть выше, чтобы лента была живой
+            "ORDER BY weight * (CASE WHEN image LIKE 'video:%' THEN 1.3 WHEN image IS NOT NULL THEN 1.1 ELSE 1 END)"
+            " * (1.0 / (1 + (? - COALESCE(published_ts, fetched_ts)) / 3600.0)) DESC LIMIT ?",
             (channel, time.time(), limit)).fetchall()
 
     def set_item_status(self, item_id: int, status: str, reason: str | None = None):
@@ -132,7 +134,8 @@ class Storage:
         rows = self.db.execute(
             "SELECT text FROM posts WHERE channel=? AND kind='news' AND status!='rejected' AND created_ts>? "
             "ORDER BY created_ts DESC LIMIT ?", (channel, time.time() - hours * 3600, limit)).fetchall()
-        return [re.sub(r"<[^>]+>", "", r[0].split("\n", 1)[0]).strip() for r in rows]
+        from .core import headline
+        return [headline(r[0]) for r in rows]
 
     def get_post(self, post_id: int) -> sqlite3.Row | None:
         return self.db.execute("SELECT * FROM posts WHERE id=?", (post_id,)).fetchone()

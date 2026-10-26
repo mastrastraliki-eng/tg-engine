@@ -65,6 +65,11 @@ class StyleCfg(BaseModel):
     # ИИ-иллюстрации (Gemini): off; no_photo — когда в источнике нет фото; always. Не для новостей о войне.
     ai_images: Literal["off", "no_photo", "always"] = "off"
     ai_style: str = ""              # единый стиль ИИ-картинок канала (по-английски)
+    # чередование медиа: веса видов картинки к посту, например {source: 3, chart: 2, ai: 2}.
+    # source — фото/видео из новости, chart — свечной график монеты из поста (как на бирже),
+    # ai — ИИ-иллюстрация, card — карточка с заголовком. Пусто = прежнее поведение по images/ai_images.
+    # Видео из источника берётся всегда, когда оно есть.
+    media_mix: dict[str, float] = {}
 
 
 class FilterCfg(BaseModel):
@@ -98,6 +103,14 @@ class MarketSummaryCfg(BaseModel):
     skip_review: bool = True            # данные устаревают, публикуем сразу
 
 
+class DigestCfg(BaseModel):
+    """Вечерний дайджест: главные посты дня списком со ссылками на них. Без LLM."""
+    enabled: bool = False
+    time: str = "21:00"                 # локальное время канала
+    title: str = "🗞 Головне за день"
+    max_items: int = Field(7, ge=3, le=15)
+
+
 class ProfileCfg(BaseModel):
     """Оформление канала: бот выставляет его сам, когда значения меняются."""
     title: str = ""
@@ -123,6 +136,7 @@ class ChannelCfg(BaseModel):
     promo: PromoCfg = PromoCfg()
     relay: RelayCfg = RelayCfg()
     market_summary: MarketSummaryCfg = MarketSummaryCfg()
+    digest: DigestCfg = DigestCfg()
     profile: ProfileCfg = ProfileCfg()
     queue_target: int = 3               # сколько готовых постов держать в очереди
 

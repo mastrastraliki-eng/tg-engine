@@ -8,23 +8,35 @@ bot_token_env: CRYPTO_BOT_TOKEN
 chat_id_env: CRYPTO_CHAT_ID
 mode: auto                            # стиль утверждён, крипта идёт сама
 review_chat_id_env: REVIEW_CHAT_ID
-queue_target: 2
+queue_target: 3
 sources:
   - {type: rss, url: "https://forklog.com/feed", name: ForkLog, weight: 1.2}
   - {type: rss, url: "https://incrypted.com/feed/", name: Incrypted, weight: 1.2}
   - {type: rss, url: "https://bits.media/rss2/", name: Bits.media, weight: 0.8}
   - {type: rss, url: "https://www.coindesk.com/arc/outboundfeeds/rss/", name: CoinDesk, fetch_full_text: true}
   - {type: rss, url: "https://www.theblock.co/rss.xml", name: The Block, fetch_full_text: true}
-  - {type: rss, url: "https://cointelegraph.com/rss", name: Cointelegraph}
   - {type: rss, url: "https://decrypt.co/feed", name: Decrypt, weight: 0.9}
+  - {type: rss, url: "https://ru.beincrypto.com/feed/", name: BeInCrypto, weight: 1.1}
+  - {type: rss, url: "https://blockworks.co/feed", name: Blockworks}
+  - {type: rss, url: "https://bitcoinmagazine.com/.rss/full/", name: Bitcoin Magazine, weight: 0.9}
+  - {type: rss, url: "https://cryptoslate.com/feed/", name: CryptoSlate, weight: 0.9}
+  # Telegram: короткие ролики и фото, которых нет в RSS
+  - {type: telegram, channel: cointelegraph, name: Cointelegraph, weight: 1.1}
+  # биржа: листинги и делистинги Binance — то, что двигает монеты
+  - {type: telegram, channel: binance_announcements, name: Binance, weight: 1.0,
+     include_regex: "will list|will delist|launchpool|hodler airdrop|megadrop|perpetual contract"}
 schedule:
-  posts_per_day: 8
+  # как ForkLog и Incrypted: 12–16 постов в день, примерно раз в час; плюс утренняя сводка и вечерние итоги
+  posts_per_day: 14
   active_hours: [7, 22]             # с 7:00 до 22:00 по Киеву, ночью тишина
-  min_gap_minutes: 75
+  min_gap_minutes: 45
 style:
   images: source_or_card
   card_color: "#f7931a"
-  ai_images: always                # своя ИИ-иллюстрация к каждому посту; фото статьи — запасной вариант
+  ai_images: always                # ИИ пишет описание картинки к каждому посту (используется, если выпадет ai)
+  # медиа чередуются: фото из новости, свечной график монеты из поста (как на бирже), ИИ-картинка.
+  # Видео из Telegram-источника берётся всегда.
+  media_mix: {source: 3, chart: 3, ai: 2}
   ai_style: >
     Photorealistic cinematic editorial photograph of real objects and scenes, dramatic lighting, shallow depth of field,
     dark moody tones with warm orange accent light, high detail, 35mm. No screens, no signs, no written words or numbers.
@@ -50,6 +62,7 @@ style:
     - "Сухой факт и неожиданный поворот: первая строка — серьёзно, вторая — «но есть нюанс», дальше суть и панчлайн."
     - "Было → стало → что дальше, три строки с эмодзи ⏪ ⚡️ 🔮, и панчлайн."
     - "Новость глазами персонажа: кита, новичка, регулятора или биржи, одной-двумя репликами, потом факты и панчлайн."
+    - "Цифра-удар: первая строка после рубрики — главная цифра новости крупно и жирным (<b>💰 $2,5 млрд</b>), дальше что за ней стоит, 2 строки, и панчлайн."
   rules:
     - "Никогда не давай инвестиционных советов и прогнозов цены. Если новость о цене, только факты."
     - "Объясняй термины одним предложением, если они неочевидны новичку."
@@ -61,6 +74,11 @@ style:
 filters:
   exclude_keywords: ["sponsored", "press release", "партнерський матеріал", "presale"]
   max_age_hours: 24
+digest:                             # вечерние итоги: главные посты дня ссылками
+  enabled: true
+  time: "21:00"
+  title: "🌙 Итоги дня в крипте"
+  max_items: 7
 promo:
   enabled: true
   every_days: 5

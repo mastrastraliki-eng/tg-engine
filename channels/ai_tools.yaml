@@ -16,20 +16,31 @@ profile:                              # бот сам выставит назв�
 sources:
   - {type: rss, url: "https://techcrunch.com/category/artificial-intelligence/feed/", name: TechCrunch, weight: 1.1}
   - {type: rss, url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", name: The Verge, weight: 1.1}
-  - {type: rss, url: "https://venturebeat.com/category/ai/feed/", name: VentureBeat}
+  - {type: rss, url: "https://openai.com/news/rss.xml", name: OpenAI, weight: 1.2}
+  - {type: rss, url: "https://blog.google/technology/ai/rss/", name: Google AI, weight: 1.1}
+  - {type: rss, url: "https://huggingface.co/blog/feed.xml", name: Hugging Face, weight: 0.9}
+  - {type: rss, url: "https://arstechnica.com/ai/feed/", name: Ars Technica, weight: 0.9}
   - {type: rss, url: "https://the-decoder.com/feed/", name: The Decoder, weight: 1.1}
   - {type: rss, url: "https://www.marktechpost.com/feed/", name: MarkTechPost, weight: 0.8}
   - {type: rss, url: "https://dou.ua/feed/", name: DOU, weight: 1.2, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
   - {type: rss, url: "https://ain.ua/feed/", name: AIN, weight: 1.2, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
-  - {type: rss, url: "https://mezha.media/feed/", name: Mezha, weight: 1.1, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
+  - {type: rss, url: "https://itc.ua/feed/", name: ITC, weight: 1.1, include_regex: "(?i)\\b(ШІ|AI|штучн\\w* інтелект|нейромереж\\w*|ChatGPT|OpenAI|Claude|Gemini|LLM)\\b"}
+  # Telegram-каналы про нейросети: короткие видео-демо новых инструментов
+  - {type: telegram, channel: ai_newz, name: эйай ньюз, weight: 1.1}
+  - {type: telegram, channel: denissexy, name: Denis Sexy IT, weight: 1.0}
 schedule:
-  posts_per_day: 6
+  # топовые ИИ-каналы (эйай ньюз, Denis Sexy IT) дают 3–5 постов в день, зато с видео-демо
+  posts_per_day: 5
   active_hours: [9, 22]
-  min_gap_minutes: 90
+  min_gap_minutes: 120
 style:
   images: source_or_card
   card_color: "#8b5cf6"
-  ai_images: "off"
+  ai_images: no_photo
+  ai_style: >
+    Clean futuristic 3D render, soft neon violet and blue light, minimal composition, high detail.
+    No screens, no written words, no logos, no real people.
+  media_mix: {source: 4, ai: 1}   # в основном фото и видео из новости, иногда своя ИИ-картинка
   language: uk
   voice: >
     Живо, смішно й по ділу, як найдотепніший друг-айтішник у чаті: іронія, мемні порівняння з життя, легкий

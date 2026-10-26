@@ -23,6 +23,15 @@ QUEUE_MAX_AGE_HOURS = 12
 SEED_GAP_MINUTES = 12
 
 
+def headline(text: str) -> str:
+    """Заголовок поста: первая содержательная строка, а не короткая рубрика вроде «⚡️ Терміново»."""
+    lines = [l.strip() for l in re.sub(r"<[^>]+>", "", text or "").split("\n") if l.strip()]
+    for l in lines:
+        if len(re.findall(r"\w{2,}", l)) >= 3:
+            return l
+    return lines[0] if lines else ""
+
+
 def _stems(text: str) -> set[str]:
     return {w[:5] for w in sources.normalize_title(text).split() if len(w) > 3}
 
@@ -86,6 +95,55 @@ class Engine:
         if path:
             self.st.set_state("_global", k, str(used + 1))
         return path
+
+    def chart_image(self, ch: ChannelCfg, coin: tuple[str, str]) -> str | None:
+        """Свечной график монеты за сутки; один и тот же график держим 20 минут, чтобы не дёргать API."""
+        cid, sym = coin
+        cached = (self.st.get_state("_charts", cid) or "").split("|", 1)
+        if len(cached) == 2 and time.time() - float(cached[0]) < 1200 and os.path.exists(cached[1]):
+            return cached[1]
+        with httpx.Client(headers={"User-Agent": sources.UA}, timeout=20) as c:
+            ohlc = market.fetch_ohlc(c, cid, days=1)
+        if len(ohlc) < 10:
+            return None
+        path = cards.chart_card(sym, ohlc, ch.style.card_label or ch.title, ch.style.card_color,
+                                self.s.cards_dir, ch.schedule.timezone)
+        self.st.set_state("_charts", cid, f"{time.time()}|{path}")
+        return path
+
+    def pick_media(self, ch: ChannelCfg, draft, title: str, first: str,
+                   src_img: str | None) -> tuple[str | None, str | None]:
+        """Чередует виды медиа по весам media_mix, чтобы лента не была однообразной.
+
+        Видео из источника берём всегда. Вид, который был в прошлом посте, выпадает реже.
+        Если выбранный вид не получился (нет монеты, сервис картинок лёг), пробуем следующий.
+        """
+        mix = ch.style.media_mix
+        card = self.images_for(ch, first, None)[0] if ch.style.images != "none" else None
+        if src_img and src_img.startswith("video:"):
+            self.st.set_state(ch.id, "last_media", "video")
+            return src_img, card
+        coin = market.detect_coin(f"{draft.text} {title}") if mix.get("chart") else None
+        makers = {
+            "source": (lambda: src_img) if src_img else None,
+            "chart": (lambda: self.chart_image(ch, coin)) if coin else None,
+            "ai": (lambda: self.ai_image(draft.image_prompt, ch.style.ai_style)) if draft.image_prompt else None,
+            "card": (lambda: card) if card else None,
+        }
+        last = self.st.get_state(ch.id, "last_media")
+        pool = {k: w * (0.25 if k == last else 1.0) for k, w in mix.items() if w > 0 and makers.get(k)}
+        while pool:
+            kind = self.rng.choices(list(pool), weights=list(pool.values()))[0]
+            pool.pop(kind)
+            try:
+                image = makers[kind]()
+            except Exception as e:  # медиа не должно ронять пост
+                log.warning("[%s] media %s failed: %s", ch.id, kind, e)
+                image = None
+            if image:
+                self.st.set_state(ch.id, "last_media", kind)
+                return image, (src_img if kind != "source" and src_img else card)
+        return (src_img, card) if src_img else (card, None)
 
     def next_format(self, ch: ChannelCfg) -> str:
         """Случайный формат подачи, но не тот же, что в двух последних постах."""
@@ -155,7 +213,7 @@ class Engine:
             if not draft or not draft.suitable or not draft.text.strip():
                 self.st.set_item_status(item["id"], "rejected", draft.reason if draft else "refusal")
                 continue
-            first = re.sub(r"<[^>]+>", "", draft.text.strip().split("\n", 1)[0]) or item["title"]
+            first = headline(draft.text) or item["title"]
             if is_repeat(first, recent):
                 self.st.set_item_status(item["id"], "duplicate", "same story as a recent post")
                 log.info("[%s] skip repeat: %s", ch.id, first[:80])
@@ -169,11 +227,14 @@ class Engine:
                     src_img = sources.fetch_og_image(c, item["url"])
             if not draft.media_ok:
                 src_img = None
-            image, fallback = self.images_for(ch, first, src_img)
-            if ch.style.ai_images == "always" or (ch.style.ai_images == "no_photo" and not src_img):
-                ai = self.ai_image(draft.image_prompt, ch.style.ai_style)
-                if ai:
-                    image, fallback = ai, image
+            if ch.style.media_mix:
+                image, fallback = self.pick_media(ch, draft, item["title"], first, src_img)
+            else:
+                image, fallback = self.images_for(ch, first, src_img)
+                if ch.style.ai_images == "always" or (ch.style.ai_images == "no_photo" and not src_img):
+                    ai = self.ai_image(draft.image_prompt, ch.style.ai_style)
+                    if ai:
+                        image, fallback = ai, image
             post_id = self.st.add_post(ch.id, text, status, item_id=item["id"], image=image, fallback_image=fallback)
             self.st.set_item_status(item["id"], "used")
             if status == "pending_review":
@@ -409,7 +470,8 @@ class Engine:
         today = datetime.fromtimestamp(now, ZoneInfo(ch.schedule.timezone)).strftime("%Y-%m-%d")
         with httpx.Client(headers={"User-Agent": sources.UA}, timeout=20) as c:
             coins = market.fetch_markets(c)
-        text = market.build_summary(coins, ch.market_summary.coins, ch.market_summary.movers, ch.style.language)
+            fng = market.fear_greed(c)
+        text = market.build_summary(coins, ch.market_summary.coins, ch.market_summary.movers, ch.style.language, fng)
         if ch.style.signature:
             text += "\n\n" + html.escape(ch.style.signature)
         self.st.set_state(ch.id, "summary_date", today)
@@ -426,6 +488,48 @@ class Engine:
         if status == "pending_review":
             self.send_for_review(ch, pid, text, image)
             return None
+        return self.send(ch, self.st.get_post(pid))
+
+    def digest_due(self, ch: ChannelCfg, now: float) -> bool:
+        g = ch.digest
+        if not g.enabled or not ch.username:
+            return False
+        local = datetime.fromtimestamp(now, ZoneInfo(ch.schedule.timezone))
+        hh, mm = (int(x) for x in g.time.split(":"))
+        return (local.hour, local.minute) >= (hh, mm) and self.st.get_state(ch.id, "digest_date") != \
+            local.strftime("%Y-%m-%d")
+
+    def digest(self, ch: ChannelCfg, now: float) -> int | None:
+        """Вечерний дайджест: заголовки постов дня, каждый ссылкой на сам пост в канале."""
+        g = ch.digest
+        self.st.set_state(ch.id, "digest_date",
+                          datetime.fromtimestamp(now, ZoneInfo(ch.schedule.timezone)).strftime("%Y-%m-%d"))
+        rows = self.st.db.execute(
+            "SELECT text, message_id FROM posts WHERE channel=? AND kind='news' AND status='published' "
+            "AND message_id IS NOT NULL AND published_ts>=? ORDER BY published_ts",
+            (ch.id, day_start_ts(now, ch.schedule))).fetchall()
+        if len(rows) < 3:
+            return None
+        if len(rows) > g.max_items:  # равномерно по всему дню, а не только вечер
+            step = len(rows) / g.max_items
+            rows = [rows[int(i * step)] for i in range(g.max_items)]
+        user = ch.username.lstrip("@")
+        lines = []
+        for r in rows:
+            h = headline(r["text"])
+            h = h if len(h) <= 120 else h[:117].rsplit(" ", 1)[0] + "…"
+            lines.append(f'▪️ <a href="https://t.me/{html.escape(user)}/{r["message_id"]}">{html.escape(h)}</a>')
+        date = datetime.fromtimestamp(now, ZoneInfo(ch.schedule.timezone)).strftime("%d.%m")
+        text = f"<b>{html.escape(g.title)} · {date}</b>\n\n" + "\n\n".join(lines) + f"\n\n➖➖➖\n{channel_link(user)}"
+        image = None
+        if ch.style.images != "none":
+            try:
+                image = cards.title_card(f"{cards.clean(g.title)} · {date}", ch.style.card_label or ch.title,
+                                         ch.style.card_color, ch.style.signature, self.s.cards_dir,
+                                         ch.schedule.timezone)
+            except Exception as e:
+                log.warning("[%s] digest card failed: %s", ch.id, e)
+        pid = self.st.add_post(ch.id, text, "queued", kind="digest", image=image)
         return self.send(ch, self.st.get_post(pid))
 
     def tick(self, now: float | None = None):
@@ -463,6 +567,11 @@ class Engine:
                         self.market_summary(ch, now)
                 except Exception as e:
                     log.warning("[%s] market summary failed: %s", ch.id, e)
+                try:
+                    if self.digest_due(ch, now):
+                        self.digest(ch, now)
+                except Exception as e:
+                    log.warning("[%s] digest failed: %s", ch.id, e)
                 try:
                     self.publish_due(ch, now)
                 except Exception as e:

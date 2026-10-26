@@ -6,9 +6,9 @@ channels_dir: channels
 llm_providers: [groq, gemini, cloudflare, openrouter, template]
 llm_model: claude-sonnet-5-5    # используется, только если в списке есть anthropic
 llm_effort: low
-max_llm_calls_per_day: 400      # предохранитель от зацикливания
+max_llm_calls_per_day: 600      # предохранитель от зацикливания: постов теперь ~40 в день
 tick_seconds: 60
-collect_every_minutes: 30
+collect_every_minutes: 20
 dry_run: false
 seed_once: "ai-2026-10-21-22h"   # разовый выпуск сразу после обновления (новая метка = новый выпуск)
 seed_posts: 1

@@ -178,3 +178,71 @@ def market_card(coins: list[dict], featured: list[str], lang: str = "ru", label:
     date = datetime.fromtimestamp(time.time(), ZoneInfo(tz)).strftime("%d.%m.%Y")
     d.text((80, H - 70), f"{date} · CoinGecko, USD", font=small, fill=(170, 176, 190))
     return _save(img, out_dir, f"market|{date}|{time.time()}")
+
+
+def chart_card(symbol: str, ohlc: list[list[float]], label: str = "", accent: str = "#f7931a",
+               out_dir: str | Path = "data/cards", tz: str = "Europe/Kyiv", period: str = "24H") -> str:
+    """Свечной график монеты в стиле биржевого терминала: пара, цена, изменение, свечи, шкала цен."""
+    from .market import _price
+    bg, grid, muted = (13, 17, 23), (33, 38, 48), (140, 148, 160)
+    up, down = (38, 196, 133), (240, 73, 90)
+    img = Image.new("RGB", (W, H), bg)
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, W, 6], fill=_rgb(accent))
+    first, last = ohlc[0][1], ohlc[-1][4]
+    chg = (last / first - 1) * 100 if first else 0.0
+    color = up if chg >= 0 else down
+    # шапка: пара, цена, изменение, метка канала
+    d.text((60, 40), f"{symbol}/USD", font=_font(44), fill="white")
+    pw = d.textlength(f"{symbol}/USD", font=_font(44))
+    d.text((60 + pw + 28, 46), _price(last), font=_font(40, bold=False), fill=color)
+    tag = f"{chg:+.2f}%"
+    tf = _font(30)
+    tx = 60 + pw + 28 + d.textlength(_price(last), font=_font(40, bold=False)) + 24
+    tw = d.textlength(tag, font=tf)
+    d.rounded_rectangle([tx, 48, tx + tw + 28, 96], radius=10, fill=color)
+    d.text((tx + 14, 54), tag, font=tf, fill="white")
+    if label:
+        lf = _font(26, bold=False)
+        lw = d.textlength(clean(label), font=lf)
+        d.text((W - 60 - lw, 56), clean(label), font=lf, fill=muted)
+    # поле графика
+    left, top, right, bottom = 60, 130, W - 170, H - 80
+    hi = max(c[2] for c in ohlc)
+    lo = min(c[3] for c in ohlc)
+    span = (hi - lo) or hi * 0.01 or 1
+    hi, lo = hi + span * 0.06, lo - span * 0.06
+
+    def y(v):
+        return bottom - (v - lo) / (hi - lo) * (bottom - top)
+
+    sf = _font(22, bold=False)
+    for i in range(5):
+        v = lo + (hi - lo) * i / 4
+        yy = y(v)
+        d.line([(left, yy), (right, yy)], fill=grid, width=1)
+        d.text((right + 14, yy - 12), _price(v), font=sf, fill=muted)
+    n = len(ohlc)
+    step = (right - left) / n
+    body = max(3, int(step * 0.62))
+    for i, (_, o, h, l, c) in enumerate(ohlc):
+        cx = left + step * (i + 0.5)
+        col = up if c >= o else down
+        d.line([(cx, y(h)), (cx, y(l))], fill=col, width=2)
+        y1, y2 = sorted((y(o), y(c)))
+        d.rectangle([cx - body / 2, y1, cx + body / 2, max(y2, y1 + 2)], fill=col)
+    # линия последней цены
+    ly = y(last)
+    for x in range(left, right, 14):
+        d.line([(x, ly), (x + 7, ly)], fill=color, width=2)
+    d.rounded_rectangle([right + 6, ly - 17, W - 20, ly + 17], radius=6, fill=color)
+    d.text((right + 14, ly - 13), _price(last), font=sf, fill="white")
+    # подписи времени
+    zone = ZoneInfo(tz)
+    for i in (0, n // 2, n - 1):
+        t = datetime.fromtimestamp(ohlc[i][0] / 1000, zone).strftime("%H:%M")
+        cx = left + step * (i + 0.5)
+        d.text((cx - d.textlength(t, font=sf) / 2, bottom + 14), t, font=sf, fill=muted)
+    date = datetime.fromtimestamp(time.time(), zone).strftime("%d.%m.%Y %H:%M")
+    d.text((60, H - 36), f"{period} · {date} · CoinGecko", font=_font(20, bold=False), fill=muted)
+    return _save(img, out_dir, f"chart|{symbol}|{ohlc[-1][0]}|{label}|{time.time()}")

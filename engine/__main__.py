@@ -37,6 +37,8 @@ def main(argv=None):
     p = sub.add_parser("resume", help="снять канал с паузы")
     p.add_argument("channel")
     sub.add_parser("stats", help="статистика постов")
+    p = sub.add_parser("sources", help="проверить источники: сколько материалов, фото и видео отдаёт каждый")
+    p.add_argument("channel", nargs="?")
     p = sub.add_parser("health", help="отчёт о работе (как ежедневный в 9:00)")
     p.add_argument("--send", action="store_true", help="отправить в личку от бота уведомлений")
     a = ap.parse_args(argv)
@@ -71,6 +73,27 @@ def main(argv=None):
         if len(tokens) != len(set(tokens)):
             print("! несколько каналов на одном боте: при бане бота пострадают все они")
         return 0 if ok else 1
+
+    if a.cmd == "sources":
+        import httpx
+        from . import sources
+        bad = 0
+        with httpx.Client(headers={"User-Agent": sources.UA}, timeout=20, follow_redirects=True) as c:
+            for ch in channels.values():
+                if not ch.enabled or (a.channel and ch.id != a.channel):
+                    continue
+                print(f"== {ch.id}")
+                for src in ch.sources:
+                    try:
+                        items = sources.fetch_source(c, src)
+                        vid = sum(1 for i in items if str(i.get("image") or "").startswith("video:"))
+                        pic = sum(1 for i in items if i.get("image")) - vid
+                        print(f"  ✓ {src.name:28} {len(items):3} шт, фото {pic}, видео {vid}")
+                    except Exception as e:
+                        bad += 1
+                        print(f"  ✗ {src.name:28} {str(e)[:90]}")
+        print(f"не работает источников: {bad}")
+        return 0
 
     st = Storage(":memory:" if a.cmd == "preview" else s.db_path)
 
