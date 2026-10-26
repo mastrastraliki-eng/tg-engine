@@ -19,7 +19,6 @@ sources:
   - {type: rss, url: "https://ru.beincrypto.com/feed/", name: BeInCrypto, weight: 1.1}
   - {type: rss, url: "https://blockworks.co/feed", name: Blockworks}
   - {type: rss, url: "https://bitcoinmagazine.com/.rss/full/", name: Bitcoin Magazine, weight: 0.9}
-  - {type: rss, url: "https://cryptoslate.com/feed/", name: CryptoSlate, weight: 0.9}
   # Telegram: короткие ролики и фото, которых нет в RSS
   - {type: telegram, channel: cointelegraph, name: Cointelegraph, weight: 1.1}
   # биржа: листинги и делистинги Binance — то, что двигает монеты
