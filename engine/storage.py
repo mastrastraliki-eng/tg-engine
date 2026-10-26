@@ -96,7 +96,7 @@ class Storage:
         return self.db.execute(
             "SELECT * FROM items WHERE channel=? AND status='new' "
             # свежее и весомее выше; с видео или фото чуть выше, чтобы лента была живой
-            "ORDER BY weight * (CASE WHEN image LIKE 'video:%' THEN 1.3 WHEN image IS NOT NULL THEN 1.1 ELSE 1 END)"
+            "ORDER BY weight * (CASE WHEN image LIKE 'video:%' THEN 1.6 WHEN image IS NOT NULL THEN 1.15 ELSE 1 END)"
             " * (1.0 / (1 + (? - COALESCE(published_ts, fetched_ts)) / 3600.0)) DESC LIMIT ?",
             (channel, time.time(), limit)).fetchall()
 

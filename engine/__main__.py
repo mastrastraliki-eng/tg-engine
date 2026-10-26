@@ -37,6 +37,8 @@ def main(argv=None):
     p = sub.add_parser("resume", help="снять канал с паузы")
     p.add_argument("channel")
     sub.add_parser("stats", help="статистика постов")
+    p = sub.add_parser("posts", help="последние опубликованные посты: текст и вид медиа")
+    p.add_argument("-n", type=int, default=6)
     p = sub.add_parser("sources", help="проверить источники: сколько материалов, фото и видео отдаёт каждый")
     p.add_argument("channel", nargs="?")
     p = sub.add_parser("health", help="отчёт о работе (как ежедневный в 9:00)")
@@ -132,6 +134,20 @@ def main(argv=None):
     if a.cmd == "resume":
         st.set_state(a.channel, "paused", None)
         print(f"{a.channel}: пауза снята")
+        return 0
+
+    if a.cmd == "posts":
+        for ch in channels.values():
+            if not ch.enabled:
+                continue
+            rows = st.db.execute("SELECT * FROM posts WHERE channel=? AND status='published' "
+                                 "ORDER BY published_ts DESC LIMIT ?", (ch.id, a.n)).fetchall()
+            print(f"==== {ch.id}")
+            for r in reversed(rows):
+                img = r["image"] or ""
+                kind = ("видео" if img.startswith("video:") else "фото источника" if img.startswith("http")
+                        else "своя картинка" if img else "без медиа")
+                print(f"--- #{r['message_id']} [{r['kind']}] {kind}\n{r['text']}\n")
         return 0
 
     if a.cmd == "stats":

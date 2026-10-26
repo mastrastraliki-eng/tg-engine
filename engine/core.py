@@ -146,14 +146,15 @@ class Engine:
         return (src_img, card) if src_img else (card, None)
 
     def next_format(self, ch: ChannelCfg) -> str:
-        """Случайный формат подачи, но не тот же, что в двух последних постах."""
+        """Случайный формат подачи, но не тот же, что в трёх последних постах."""
         fmts = ch.style.formats
         if not fmts:
             return ""
         recent = (self.st.get_state(ch.id, "last_formats") or "").split("|")
-        pool = [i for i in range(len(fmts)) if str(i) not in recent[-2:]] or list(range(len(fmts)))
+        keep = min(3, len(fmts) - 1)
+        pool = [i for i in range(len(fmts)) if str(i) not in recent[len(recent) - keep:]] or list(range(len(fmts)))
         i = self.rng.choice(pool)
-        self.st.set_state(ch.id, "last_formats", "|".join((recent + [str(i)])[-2:]))
+        self.st.set_state(ch.id, "last_formats", "|".join((recent + [str(i)])[-3:]))
         return fmts[i]
 
     def alert(self, msg: str):

@@ -45,6 +45,7 @@ $script = @(
     'journalctl -u tg-engine -n 40 --no-pager'
     'echo; echo "==== report"; cd /opt/tg-engine && sudo -u tgengine .venv/bin/python -m engine health --send; cd /'
     'echo; echo "==== sources"; cd /opt/tg-engine && sudo -u tgengine .venv/bin/python -m engine sources; cd /'
+    'echo; echo "==== posts"; cd /opt/tg-engine && sudo -u tgengine .venv/bin/python -m engine posts -n 6; cd /'
     'rm -rf /root/tg-engine-src /tmp/tg-engine /tmp/tg-engine-update.tgz /tmp/tg-update.sh'
     'echo "cleanup done"'
 ) -join "`n"
