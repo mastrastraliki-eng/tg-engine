@@ -592,3 +592,34 @@ def test_promo_drops_invented_links():
     ch, partner = make_channel(), make_channel(id="p", username="real_chan")
     text = R().promo(ch, partner)
     assert "example" not in text and text.count("👉") == 1 and 'href="https://t.me/real_chan"' in text
+
+
+def test_strip_leaks_drops_service_lines():
+    from engine.rewriter import strip_leaks
+    text = ("🆕 <b>Gemini тепер генерує відео з фото за хвилину</b>\n\n🤖 Google додав режим Veo у застосунок для всіх "
+            "користувачів Pro, ролики до 8 секунд у 1080p.\n⚡️ Працює з українською мовою і звуком.\n"
+            "👉 <b>Як спробувати:</b> у матеріалі не вказано, де саме відкрити функцію.")
+    out = strip_leaks(text)
+    assert out and "матеріал" not in out and "Veo" in out
+    assert strip_leaks("⚡️ <b>Деталі в матеріалі не вказано, але щось сталося</b>\n\nтекст") is None
+    assert strip_leaks("🐋 <b>Кит продав 1500 ETH після 9 років сну</b>\n\nПросто факт.") is not None
+
+
+def test_video_uploaded_when_telegram_cannot_fetch_url():
+    import httpx
+    from engine.telegram import Bot
+    calls = []
+
+    def handler(req: httpx.Request):
+        calls.append((req.method, req.url.host, req.url.path))
+        if req.url.host == "cdn.example":
+            return httpx.Response(200, content=b"\0" * 5000)
+        if req.headers.get("content-type", "").startswith("application/json"):
+            return httpx.Response(200, json={"ok": False, "error_code": 400,
+                                             "description": "Bad Request: failed to get HTTP URL content"})
+        return httpx.Response(200, json={"ok": True, "result": {"message_id": 7}})
+
+    bot = Bot("t", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert bot.send_post("@c", "<b>x</b>", "video:https://cdn.example/v.mp4") == 7
+    assert bot.last_media == "video:https://cdn.example/v.mp4"
+    assert [c[2].rsplit("/", 1)[-1] for c in calls] == ["sendVideo", "v.mp4", "sendVideo"]

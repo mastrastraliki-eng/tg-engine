@@ -116,6 +116,13 @@ def build_report(eng, now: float | None = None, client: httpx.Client | None = No
                              (ch.id, now - 86400)).fetchone()[0]
         lines.append(f"{name}: вышло за сутки {posts} (подготовлено {made}), "
                      f"подписчиков {subs if subs is not None else '?'}{delta}")
+        media = st.db.execute(
+            "SELECT SUM(image LIKE 'video:%'), SUM(image LIKE 'http%'), SUM(image IS NOT NULL AND image NOT LIKE 'video:%' "
+            "AND image NOT LIKE 'http%'), SUM(image IS NULL) FROM posts WHERE channel=? AND status='published' "
+            "AND published_ts>=?", (ch.id, now - 86400)).fetchone()
+        if posts:
+            lines.append(f"   медиа: видео {media[0] or 0}, фото из новостей {media[1] or 0}, "
+                         f"своя картинка {media[2] or 0}, без медиа {media[3] or 0}")
         if eng.paused(ch):
             problems.append(f"{name} на паузе: {eng.paused(ch)}")
         if posts == 0:

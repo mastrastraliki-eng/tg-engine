@@ -58,6 +58,34 @@ def template_draft(ch: ChannelCfg, item: dict, full_text: str = "") -> Draft | N
     return Draft(suitable=True, reason="template", text=text, media_ok=True)
 
 
+# служебные фразы ИИ о самом материале: читателю они не нужны («в материале не указано», «нет информации»)
+LEAK = re.compile(
+    r"(?i)(не\s+вказан|не\s+зазначен|не\s+уточню|не\s+повідомля\w*ся|немає\s+(інформації|даних|деталей|відомостей)"
+    r"|інформаці\w*\s+(немає|відсутн)|(у|в|з)\s+матеріал(?!\w*\s+справ)\w*|матеріал\w*\s+не\b|джерел\w*\s+не\s+(вказ|наво)"
+    r"|не\s+указан|не\s+уточня|нет\s+(информации|данных|деталей|сведений)|информаци\w*\s+(нет|отсутств)"
+    r"|(в|из)\s+материал(?!\w*\s+дел)\w*|материал\w*\s+не\b|в\s+источнике|источник\w*\s+не\s+(указ|привод)"
+    r"|not\s+specified|no\s+information|not\s+mentioned)")
+
+
+def strip_leaks(text: str) -> str | None:
+    """Убирает строки, где ИИ рассуждает о материале. None — если задет заголовок или почти ничего не осталось."""
+    lines = text.split("\n")
+    kept, dropped = [], 0
+    first = next((i for i, l in enumerate(lines) if len(re.findall(r"\w{2,}", re.sub(r"<[^>]+>", "", l))) >= 3), 0)
+    for i, l in enumerate(lines):
+        if LEAK.search(re.sub(r"<[^>]+>", "", l)):
+            if i <= first:
+                return None
+            dropped += 1
+            continue
+        kept.append(l)
+    out = re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip()
+    plain = re.sub(r"<[^>]+>", "", out)
+    if dropped and len(plain) < 120:
+        return None
+    return out
+
+
 def system_prompt(ch: ChannelCfg, fmt: str = "") -> str:
     st = ch.style
     rules = "\n".join(f"- {r}" for r in st.rules)
@@ -89,6 +117,8 @@ def system_prompt(ch: ChannelCfg, fmt: str = "") -> str:
 - Оформление: {st.design}
 - Форматирование только тегами Telegram HTML: <b>, <i>, <u>, <s>, <code>, <blockquote>, <tg-spoiler>, <a href="...">. Никакого Markdown.
 - Не вставляй ссылку на источник и подпись канала: их добавит система.
+- Никогда не пиши о самом материале и о том, чего в нём нет («в материале не указано», «немає інформації», «джерело не
+  уточнює»). Если какой-то элемент формата нечем заполнить, просто пропусти эту строку.
 - {tags}
 - suitable=false, если материал вне ниши, рекламный, слишком мелкий, устаревший, кликбейтный или непроверяемый слух.
 {rules}

@@ -14,7 +14,7 @@ import httpx
 
 from . import cards, health, market, sources
 from .config import ChannelCfg, Settings
-from .rewriter import BudgetExceeded, channel_link, finalize
+from .rewriter import BudgetExceeded, channel_link, finalize, strip_leaks
 from .schedule import day_start_ts, in_active_hours, next_slot
 from .telegram import Bot, TelegramError
 
@@ -214,6 +214,12 @@ class Engine:
             if not draft or not draft.suitable or not draft.text.strip():
                 self.st.set_item_status(item["id"], "rejected", draft.reason if draft else "refusal")
                 continue
+            body = strip_leaks(draft.text)
+            if not body:
+                self.st.set_item_status(item["id"], "rejected", "post talks about missing info")
+                log.info("[%s] skip leaky draft: %s", ch.id, draft.text[:80])
+                continue
+            draft.text = body
             first = headline(draft.text) or item["title"]
             if is_repeat(first, recent):
                 self.st.set_item_status(item["id"], "duplicate", "same story as a recent post")
@@ -390,6 +396,10 @@ class Engine:
             log.warning("[%s] send failed: %s", ch.id, e)
             return None
         self.st.set_post_status(post["id"], "published", message_id=mid)
+        sent = getattr(self.bot(ch.bot_token), "last_media", post["image"])
+        if sent != post["image"]:  # фото источника не прошло и ушла запасная картинка (или без медиа)
+            self.st.db.execute("UPDATE posts SET image=? WHERE id=?", (sent, post["id"]))
+            self.st.db.commit()
         log.info("[%s] published post %d as message %s", ch.id, post["id"], mid)
         return mid
 
