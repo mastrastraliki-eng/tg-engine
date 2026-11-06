@@ -192,7 +192,13 @@ class Engine:
         made = 0
         attempts = 0
         recent = self.st.recent_headlines(ch.id)
-        for item in self.st.candidates(ch.id, limit=target * 4):
+        cands = self.st.candidates(ch.id, limit=target * 4)
+        want_video = self.s.seed_video and int(self.st.get_state(ch.id, "seed_left", "0")) > 0 \
+            and not self.st.next_queued(ch.id, video=True)
+        if want_video:  # разовый выпуск с видео: сначала материалы с видео, даже если очередь полна
+            cands = self.st.video_candidates(ch.id, limit=5) + list(cands)
+            ready = min(ready, target - 1)
+        for item in cands:
             if ready >= target or attempts >= target * 3:
                 break
             attempts += 1
@@ -338,7 +344,10 @@ class Engine:
         if self.paused(ch):
             return None
         if self.seed_step(ch, now):
-            post = self.st.next_queued(ch.id)
+            post = self.st.next_queued(ch.id, video=True) if self.s.seed_video else None
+            if not post and self.s.seed_video and self.st.has_video_candidates(ch.id):
+                return None  # пост с видео ещё готовится: ждём его, а не выпускаем первый попавшийся
+            post = post or self.st.next_queued(ch.id)
             if not post:
                 return None
             msg_id = self.send(ch, post)

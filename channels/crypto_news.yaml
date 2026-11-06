@@ -1,6 +1,6 @@
 id: crypto_news
-title: "📈 Крипто Пульс"
-username: "kriptopuls_news"
+title: "💰💵 Smart Money | Crypto Trading News 💵💰"
+username: "smartmoney_cryptonews"
 niche: >
   Новини криптовалют і блокчейну: ринок BTC/ETH, регулювання, великі угоди, біржі,
   злами та безпека, потоки в крипто-ETF, ончейн-дані китів, а також макро, яке рухає крипту: ставка ФРС,
@@ -33,6 +33,7 @@ schedule:
 style:
   images: source_or_card
   card_color: "#f7931a"
+  card_label: "Smart Money"
   ai_images: always                # ИИ пишет описание картинки к каждому посту (используется, если выпадет ai)
   # медиа чередуются: фото из новости, свечной график монеты из поста (как на бирже), ИИ-картинка.
   # Видео из Telegram-источника берётся всегда.

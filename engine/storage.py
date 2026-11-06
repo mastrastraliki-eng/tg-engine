@@ -124,10 +124,19 @@ class Storage:
         return self.db.execute("SELECT COUNT(*) FROM posts WHERE channel=? AND status=?",
                                (channel, status)).fetchone()[0]
 
-    def next_queued(self, channel: str) -> sqlite3.Row | None:
+    def next_queued(self, channel: str, video: bool = False) -> sqlite3.Row | None:
         return self.db.execute(
-            "SELECT * FROM posts WHERE channel=? AND status='queued' ORDER BY created_ts LIMIT 1",
+            "SELECT * FROM posts WHERE channel=? AND status='queued'"
+            + (" AND image LIKE 'video:%'" if video else "") + " ORDER BY created_ts LIMIT 1",
             (channel,)).fetchone()
+
+    def video_candidates(self, channel: str, limit: int = 5) -> list[sqlite3.Row]:
+        return self.db.execute(
+            "SELECT * FROM items WHERE channel=? AND status='new' AND image LIKE 'video:%' "
+            "ORDER BY COALESCE(published_ts, fetched_ts) DESC LIMIT ?", (channel, limit)).fetchall()
+
+    def has_video_candidates(self, channel: str) -> bool:
+        return bool(self.video_candidates(channel, 1))
 
     def recent_headlines(self, channel: str, hours: float = 24, limit: int = 40) -> list[str]:
         """Заголовки недавних постов канала, чтобы LLM не писала второй пост про то же событие."""

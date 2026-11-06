@@ -623,3 +623,17 @@ def test_video_uploaded_when_telegram_cannot_fetch_url():
     assert bot.send_post("@c", "<b>x</b>", "video:https://cdn.example/v.mp4") == 7
     assert bot.last_media == "video:https://cdn.example/v.mp4"
     assert [c[2].rsplit("/", 1)[-1] for c in calls] == ["sendVideo", "v.mp4", "sendVideo"]
+
+
+def test_seed_video_publishes_post_with_video_first(monkeypatch):
+    ch = make_channel()
+    st = Storage(":memory:")
+    s = Settings(seed_video=True)
+    eng = Engine(s, {ch.id: ch}, st, FakeRewriter(), bot_factory=FakeBot)
+    st.add_post(ch.id, "<b>Звичайна новина без відео тут</b>", "queued", image="https://ex.com/p.jpg")
+    vid = st.add_post(ch.id, "<b>Новина з відео з місця події</b>", "queued", image="video:https://cdn/v.mp4")
+    eng.seed(ch, 1, now=NOW)
+    monkeypatch.setenv("T1", "t")
+    monkeypatch.setenv("C1", "c")
+    eng.publish_due(ch, NOW + 1)
+    assert st.get_post(vid)["status"] == "published"

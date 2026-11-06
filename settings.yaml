@@ -10,6 +10,7 @@ max_llm_calls_per_day: 600      # предохранитель от зацикл
 tick_seconds: 60
 collect_every_minutes: 20
 dry_run: false
-seed_once: "ai-2026-10-21-22h"   # разовый выпуск сразу после обновления (новая метка = новый выпуск)
+seed_once: "video-2026-11-06"   # разовый выпуск сразу после обновления (новая метка = новый выпуск)
 seed_posts: 1
-seed_channels: [ai_tools]
+seed_channels: [ua_news]
+seed_video: true                # разовый пост — с видео из источника

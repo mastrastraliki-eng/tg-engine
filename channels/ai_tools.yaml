@@ -1,6 +1,6 @@
 id: ai_tools
-title: "🧠 ШІ на щодень | Нейромережі"
-username: "vartovyi_neba_ua"          # бывший канал тревог; сменить @ можно только в Telegram вручную
+title: "🤖🔥 GigaBrain | AI News & Tools 🔥🤖"
+username: "gigabrain_ua"               # @ меняется только в Telegram (бот не умеет)
 niche: >
   Практичні ШІ-інструменти й нейромережі: нові можливості ChatGPT, Claude, Gemini та інших сервісів,
   корисні програми, промпти й лайфхаки, як застосувати ШІ в роботі, навчанні й побуті.
@@ -10,8 +10,8 @@ chat_id_env: ALERTS_CHAT_ID
 mode: auto
 queue_target: 2
 profile:                              # бот сам выставит название, описание и аватар канала
-  title: "🧠 ШІ на щодень | Нейромережі"
-  description: "Нейромережі, які реально економлять час. Нові ШІ-інструменти, промпти й лайфхаки українською — щодня, коротко і без води."
+  title: "🤖🔥 GigaBrain | AI News & Tools 🔥🤖"
+  description: "Прокачуємо мозок з ШІ 🧠⚡ Нові нейромережі, промпти й лайфхаки українською — щодня, коротко і без води."
   photo: assets/ai_tools_avatar.png
 sources:
   - {type: rss, url: "https://techcrunch.com/category/artificial-intelligence/feed/", name: TechCrunch, weight: 1.1}
@@ -36,6 +36,7 @@ schedule:
 style:
   images: source_or_card
   card_color: "#8b5cf6"
+  card_label: "GigaBrain"
   ai_images: no_photo
   ai_style: >
     Clean futuristic 3D render, soft neon violet and blue light, minimal composition, high detail.

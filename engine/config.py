@@ -175,6 +175,7 @@ class Settings(BaseModel):
     seed_once: str = ""                 # новая метка = разовое стартовое наполнение каналов при запуске
     seed_posts: int = 5
     seed_channels: list[str] = []  # пусто = все каналы
+    seed_video: bool = False       # разовый выпуск — пост с видео из источника (если такое видео есть)
 
 
 def load_settings(path: str | Path = "settings.yaml") -> Settings:
